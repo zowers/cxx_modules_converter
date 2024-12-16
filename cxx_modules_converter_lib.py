@@ -35,6 +35,15 @@ content_type_to_ext: ContentTypeToExt = {
     ContentType.MODULE_INTERFACE: '.cppm',
     ContentType.MODULE_IMPL: '.cpp',
 }
+
+ContentTypeToName: TypeAlias = dict[ContentType, str]
+content_type_to_name: ContentTypeToName = {
+    ContentType.HEADER: 'header',
+    ContentType.CXX: 'source',
+    ContentType.MODULE_INTERFACE: 'module interface unit',
+    ContentType.MODULE_IMPL: 'module implementation unit',
+}
+
 ContentTypeToConverted: TypeAlias = dict[ContentType, ContentType]
 content_type_to_converted: ContentTypeToConverted = {
     ContentType.HEADER: ContentType.MODULE_INTERFACE,
@@ -69,10 +78,12 @@ def get_source_content_type(action: ConvertAction, filename: str) -> ContentType
     action_ext_types = source_ext_types[action]
     return action_ext_types.get(extension, ContentType.OTHER)
 
+def get_converted_content_type(content_type: ContentType) -> ContentType:
+    return content_type_to_converted[content_type]
+
 def convert_filename_to_content_type(filename: str, content_type: ContentType):
-    destination_content_type = content_type_to_converted[content_type]
     parts = os.path.splitext(filename)
-    new_extension = content_type_to_ext[destination_content_type]
+    new_extension = content_type_to_ext[content_type]
     new_filename = parts[0] + new_extension
     return new_filename
 
@@ -422,14 +433,16 @@ class Converter:
             case _:
                 raise RuntimeError(f'Unknown action: "{action}"')
 
-    def convert_file(self, source_directory: pathlib.Path, destination_directory: pathlib.Path, filename: str):
+    def convert_file(self, source_directory: pathlib.Path, destination_directory: pathlib.Path, filename: str) -> tuple[str, ContentType]:
         with open(source_directory.joinpath(filename)) as source_file:
             source_content = source_file.read()
         converted_content = self.convert_file_content(source_content, filename)
         content_type = get_source_content_type(self.action, filename)
-        converted_filename = convert_filename_to_content_type(filename, content_type)
+        converted_content_type = get_converted_content_type(content_type)
+        converted_filename = convert_filename_to_content_type(filename, converted_content_type)
         with open(destination_directory.joinpath(converted_filename), 'w') as destination_file:
             destination_file.write(converted_content)
+        return (converted_filename, converted_content_type)
 
     def convert_or_copy_file(self, source_directory: pathlib.Path, destination_directory: pathlib.Path, filename: str):
         content_type = get_source_content_type(self.action, filename)
@@ -437,7 +450,8 @@ class Converter:
             shutil.copy2(source_directory.joinpath(filename), destination_directory.joinpath(filename))
         else:
             print('converting', filename)
-            self.convert_file(source_directory, destination_directory, filename)
+            (converted_filename, content_type) = self.convert_file(source_directory, destination_directory, filename)
+            print('converted ', converted_filename, '\t', content_type_to_name[content_type])
 
     def convert_directory(self, source_directory: pathlib.Path, destination_directory: pathlib.Path):
         if self.options.root_dir and source_directory != self.options.root_dir:
