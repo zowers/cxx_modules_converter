@@ -1,7 +1,7 @@
 module;
+
 #include <string>
 module simple;
-
 
 namespace TestNS
 {

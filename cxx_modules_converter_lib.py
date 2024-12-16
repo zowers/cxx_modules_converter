@@ -91,6 +91,8 @@ class Line:
 
 LineList: TypeAlias = list[Line]
 
+# regex: spaces only
+spaces_rx = re.compile(r'''^\s*$''')
 # regex: #include <system_header>
 preprocessor_include_system_rx = re.compile(r'''^(\s*)#(\s*)include\s*<(.+)>(.*)$''')
 # regex: #include "local_header.h"
@@ -374,7 +376,8 @@ class Converter:
                     elif m.match(preprocessor_include_local_rx, line):
                         builder.add_module_import_from_include(line, m.matched)
                     elif (m.match(preprocessor_line_comment_rx, line)
-                          or m.match(preprocessor_other_rx, line)):
+                          or m.match(preprocessor_other_rx, line)
+                          or m.match(spaces_rx, line)):
                         builder.add_staging(line, 0)
                     elif (m.match(preprocessor_define_rx, line)):
                         builder.add_staging(line, 0)

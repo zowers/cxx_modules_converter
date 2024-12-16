@@ -149,6 +149,33 @@ import local_include;
 namespace TestNS {}
 ''')
 
+def test_module_include_system_ifdef_and_content_w_newlines():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+
+#ifdef FLAG
+
+ # include <vector>
+
+#endif // FLAG
+
+namespace TestNS {}
+''', 'simple.h')
+    assert(converted == 
+'''module;
+
+#ifdef FLAG
+
+ # include <vector>
+
+#endif // FLAG
+export module simple;
+import local_include;
+
+namespace TestNS {}
+''')
+
 def test_module_include_system_ifdef_twice():
     converted = convert_file_content(
         ConvertAction.MODULES,
@@ -487,10 +514,10 @@ def test_module_file_comment_and_include_local_and_system_w_newlines():
 // this is file comment
 
 module;
+
 #include <vector>
 export module simple;
 import local_include;
-
 ''')
 
 def test_module_file_comment_and_include_local_and_system_w_content():
@@ -519,10 +546,10 @@ class TestClass
 // this is file comment
 
 module;
+
 #include <vector>
 export module simple;
 import local_include;
-
 
 namespace TestNS
 {
@@ -533,7 +560,6 @@ class TestClass
 };
 } // namespace Test
 } // namespace TestNS
-
 ''')
 
 @pytest.fixture(scope="session")
