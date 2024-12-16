@@ -2,6 +2,7 @@ import enum
 import os
 import os.path
 import pathlib
+import re
 import shutil
 from typing import TypeAlias
 
@@ -78,6 +79,41 @@ def convert_filename_to_content_type(filename: str, content_type: ContentType):
 StrList: TypeAlias = list[str]
 new_line = '\n'
 
+class LineCompatibility(enum.IntEnum):
+    GLOBAL_MODULE_FRAGMENT = 1
+    MODULE_CONTENT = 2
+    ANY = 3
+
+class Line:
+    def __init__(self, text: str, line_compatibility: LineCompatibility):
+        self.text: str = text
+        self.line_compatibility: str = line_compatibility
+
+LineList: TypeAlias = list[Line]
+
+# regex: #include <system_header>
+preprocessor_include_system_rx = re.compile(r'''^(\s*)#(\s*)include\s*<(.+)>(.*)$''')
+# regex: #include "local_header.h"
+preprocessor_include_local_rx = re.compile(r'''^(\s*)#(\s*)include\s*"(.+)"(.*)$''')
+# regex: line comment
+preprocessor_line_comment_rx = re.compile(r'''^\s*//.*$''')
+# regex: block comment start
+preprocessor_block_comment_rx = re.compile(r'''^\s*/\*.*$''')
+# regex: block comment end
+preprocessor_block_comment_rx = re.compile(r'''^\s*\*/.*$''')
+# regex: #if
+preprocessor_if_rx = re.compile(r'''^\s*#\s*if.*$''')
+# regex: #endif
+preprocessor_endif_rx = re.compile(r'''^\s*#\s*endif.*$''')
+# regex: #define
+preprocessor_define_rx = re.compile(r'''^\s*#\s*define.*$''')
+# regex: #error
+# regex: #elif
+# regex: #else
+# regex: #pragma
+# regex: #warning
+preprocessor_other_rx = re.compile(r'''^\s*#\s*(error|elif|else|pragma|warning).*$''')
+
 class ModuleBaseBuilder:
     module_purview_start_prefix: str = ''   # 'module' or 'export module' - overriden in implementation classes
 
@@ -93,6 +129,13 @@ class ModuleBaseBuilder:
         # self.module_imports: StrList = []
         # self.module_purview_special_headers: StrList = [] # // Configuration, export, etc.
         self.module_content: StrList = []
+
+        self.module_staging: StrList = [] # staging area for next module entry
+        self.flushed_module_preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements flushed to module content
+        self.global_module_fragment_staging: StrList = [] # staging area for next global_module_fragment entry
+        self.preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements
+        self.global_module_fragment_includes_count: int = 0 # count of #include <> statements
+        self.flushed_global_module_fragment_includes_count: int = 0 # count of #include <> statements flushed to global module content
 
     def set_filename(self, filename: pathlib.Path):
         self.module_filename = filename
@@ -115,10 +158,34 @@ class ModuleBaseBuilder:
     def add_file_copyright(self, line):
         self.file_copyright.append(line)
 
-    def add_global_module_fragment(self, line):
+    def _flush_global_module_fragment(self):
+        self.flushed_global_module_fragment_includes_count = 0
+        if self.preprocessor_nesting_count != 0:
+            return
+        if self.global_module_fragment_includes_count == 0:
+            return
         if not self.global_module_fragment_start:
             self.set_global_module_fragment_start()
-        self.global_module_fragment.append(line)
+        for line in self.global_module_fragment_staging:
+            self.global_module_fragment.append(line)
+        self.global_module_fragment_staging = []
+        self.flushed_global_module_fragment_includes_count = self.global_module_fragment_includes_count
+        self.global_module_fragment_includes_count = 0
+        self._flush_module_staging()
+
+    def add_global_module_fragment(self, line):
+        self.global_module_fragment_includes_count += 1
+        self._add_global_module_fragment_staging(line, 0)
+        self._flush_global_module_fragment()
+
+    def add_staging(self, line: str, nesting_advance: int):
+        self.preprocessor_nesting_count += nesting_advance
+        self._add_module_staging(line, nesting_advance)
+        self._add_global_module_fragment_staging(line, nesting_advance)
+
+    def _add_global_module_fragment_staging(self, line: str, nesting_advance: int):
+        self.global_module_fragment_staging.append(line)
+        self._flush_global_module_fragment()
 
     def add_module_purview_special_headers(self, line):
         if not self.module_purview_start:
@@ -126,18 +193,39 @@ class ModuleBaseBuilder:
         self.module_purview_special_headers.append(line)
 
     def add_module_content(self, line):
+        self._flush_module_staging()
         if not self.module_purview_start:
             self.set_module_purview_start()
         self.module_content.append(line)
 
-    def add_module_import_from_include(self, line: str):
+    def _add_module_staging(self, line: str, nesting_advance: int):
+        self.module_staging.append(line)
+
+    def _flush_module_staging(self):
         if not self.module_purview_start:
             self.set_module_purview_start()
-            
-        line_parts = line.split('"')
-        assert(len(line_parts) == 3)
-        line_include_filename = line_parts[1]
-        line_tail = line_parts[2]
+        if self.flushed_global_module_fragment_includes_count == 0 or self.flushed_module_preprocessor_nesting_count != 0:
+            for line in self.module_staging:
+                self.module_content.append(line)
+        self.module_staging = []
+        self.flushed_module_preprocessor_nesting_count = self.preprocessor_nesting_count
+        self.flushed_global_module_fragment_includes_count = 0
+
+    def add_module_import_from_include(self, line: str, match: re.Match = None):
+        if not self.module_purview_start:
+            self.set_module_purview_start()
+        
+        if not match:
+            match = preprocessor_include_local_rx.match(line)
+        if not match:
+            print('warning: preprocessor_include_local_rx not matched')
+            self.add_module_content(line)
+            return
+
+        line_space1 = match[1]
+        line_space2 = match[1]
+        line_include_filename = match[3]
+        line_tail = match[4]
 
         if line_include_filename in self.options.always_include_names:
             self.add_module_content(line)
@@ -148,7 +236,7 @@ class ModuleBaseBuilder:
         line_module_name = filename_to_module_name(resolved_include_filename)
         if line_module_name == self.module_name:
             return None
-        import_line = f'import {line_module_name};{line_tail}'
+        import_line = f'{line_space1}{line_space2}import {line_module_name};{line_tail}'
         self.add_module_content(import_line)
     
     def resolve_include(self, include_filename: str) -> str:
@@ -162,6 +250,8 @@ class ModuleBaseBuilder:
 
     def build_result(self):
         assert(bool(self.global_module_fragment_start) == bool(self.global_module_fragment))
+        if self.flushed_module_preprocessor_nesting_count != 0:
+            self._flush_module_staging()
         if not self.module_purview_start:
             self.set_module_purview_start()
         parts = [
@@ -226,6 +316,15 @@ class HeaderScanState(enum.IntEnum):
     FILE_COMMENT = enum.auto()
     MAIN = enum.auto()
 
+class Matcher:
+    def __init__(self):
+        self.rx: re.Pattern = None
+        self.matched: re.Match = None
+    def match(self, rx: re.Pattern, s) -> re.Match:
+        self.rx = rx
+        self.matched = self.rx.match(s)
+        return self.matched
+
 class Converter:
 
     def __init__(self, action: ConvertAction):
@@ -269,11 +368,20 @@ class Converter:
                         scanState = HeaderScanState.MAIN
                         continue
                 case HeaderScanState.MAIN:
-                    line_stripped = line.strip()
-                    if (line_stripped.startswith('#include <')):
+                    m = Matcher()
+                    if m.match(preprocessor_include_system_rx, line):
                         builder.add_global_module_fragment(line)
-                    elif (line_stripped.startswith('#include "')):
-                        builder.add_module_import_from_include(line)
+                    elif m.match(preprocessor_include_local_rx, line):
+                        builder.add_module_import_from_include(line, m.matched)
+                    elif (m.match(preprocessor_line_comment_rx, line)
+                          or m.match(preprocessor_other_rx, line)):
+                        builder.add_staging(line, 0)
+                    elif (m.match(preprocessor_define_rx, line)):
+                        builder.add_staging(line, 0)
+                    elif m.match(preprocessor_if_rx, line):
+                        builder.add_staging(line, 1)
+                    elif m.match(preprocessor_endif_rx, line):
+                        builder.add_staging(line, -1)
                     else:
                         builder.add_module_content(line)
             i += 1

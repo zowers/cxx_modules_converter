@@ -37,6 +37,290 @@ def test_module_include_local():
 import local_include;
 ''')
 
+def test_module_include_system_w_inline_comment():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include <vector>    // inline comment
+''', 'simple.h')
+    assert(converted ==
+'''module;
+#include <vector>    // inline comment
+export module simple;
+''')
+
+def test_module_include_local_w_inline_comment():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"   // inline comment
+''', 'simple.h')
+    assert(converted == 
+'''export module simple;
+import local_include;   // inline comment
+''')
+
+def test_module_include_system_w_left_padding():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+''' # include <vector>
+''', 'simple.h')
+    assert(converted ==
+'''module;
+ # include <vector>
+export module simple;
+''')
+
+def test_module_include_local_w_left_padding():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+''' # include "local_include.h"
+''', 'simple.h')
+    assert(converted == 
+'''export module simple;
+  import local_include;
+''')
+
+def test_module_include_system_ifdef():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG
+ # include <vector>
+#endif // FLAG
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#ifdef FLAG
+ # include <vector>
+#endif // FLAG
+export module simple;
+import local_include;
+''')
+
+def test_module_include_system_ifdef_and_content():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG
+ # include <vector>
+#endif // FLAG
+namespace TestNS {}
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#ifdef FLAG
+ # include <vector>
+#endif // FLAG
+export module simple;
+import local_include;
+namespace TestNS {}
+''')
+
+def test_module_include_local_ifdef():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG
+ # include "local_include_2.h"
+#endif // FLAG
+''', 'simple.h')
+    assert(converted == 
+'''export module simple;
+import local_include;
+#ifdef FLAG
+  import local_include_2;
+#endif // FLAG
+''')
+
+def test_module_include_local_ifdef_and_content():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG
+ # include "local_include_2.h"
+#endif // FLAG
+namespace TestNS {}
+''', 'simple.h')
+    assert(converted == 
+'''export module simple;
+import local_include;
+#ifdef FLAG
+  import local_include_2;
+#endif // FLAG
+namespace TestNS {}
+''')
+
+def test_module_include_system_ifdef_twice():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG1
+ # include <vector>
+#endif // FLAG1
+#ifdef FLAG2
+ # include <string>
+#endif // FLAG2
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#ifdef FLAG1
+ # include <vector>
+#endif // FLAG1
+#ifdef FLAG2
+ # include <string>
+#endif // FLAG2
+export module simple;
+import local_include;
+''')
+
+def test_module_include_local_ifdef_twice():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG1
+ # include "local_include_2.h"
+#endif // FLAG1
+#ifdef FLAG2
+ # include "local_include_3.h"
+#endif // FLAG2
+''', 'simple.h')
+    assert(converted == 
+'''export module simple;
+import local_include;
+#ifdef FLAG1
+  import local_include_2;
+#endif // FLAG1
+#ifdef FLAG2
+  import local_include_3;
+#endif // FLAG2
+''')
+
+def test_module_include_system_ifdef_elif_else():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG1
+ # include <vector>
+#elif FLAG2
+ # include <string>
+#else // FLAG2
+ # include <map>
+#endif // FLAG2
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#ifdef FLAG1
+ # include <vector>
+#elif FLAG2
+ # include <string>
+#else // FLAG2
+ # include <map>
+#endif // FLAG2
+export module simple;
+import local_include;
+''')
+
+def test_module_include_system_pragma_define():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#define FLAG
+#error "error"
+#pragma test
+#warning "warning"
+#include <vector>
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#define FLAG
+#error "error"
+#pragma test
+#warning "warning"
+#include <vector>
+export module simple;
+import local_include;
+''')
+
+def test_module_include_system_and_local_in_one_ifdef():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG
+ # include <vector>
+ # include "local_include_2.h"
+#endif // FLAG
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#ifdef FLAG
+ # include <vector>
+#endif // FLAG
+export module simple;
+import local_include;
+#ifdef FLAG
+  import local_include_2;
+#endif // FLAG
+''')
+
+def test_module_include_system_and_local_in_two_ifdefs_and_comments():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+// comment flag1
+#ifdef FLAG1
+ // comment system include
+ # include <vector>
+#endif // FLAG1
+// comment flag2
+#ifdef FLAG2
+ // comment local include
+ # include "local_include_2.h"
+#endif // FLAG2
+''', 'simple.h')
+    assert(converted == 
+'''module;
+// comment flag1
+#ifdef FLAG1
+ // comment system include
+ # include <vector>
+#endif // FLAG1
+export module simple;
+import local_include;
+// comment flag2
+#ifdef FLAG2
+ // comment local include
+  import local_include_2;
+#endif // FLAG2
+''')
+
+def test_module_include_system_comment():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+// comment before system include
+#include <vector>
+''', 'simple.h')
+    assert(converted == 
+'''module;
+// comment before system include
+#include <vector>
+export module simple;
+import local_include;
+''')
+
+def test_module_include_local_comment():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+// comment before local include
+ # include "local_include_2.h"
+''', 'simple.h')
+    assert(converted == 
+'''export module simple;
+import local_include;
+// comment before local include
+  import local_include_2;
+''')
+
 def test_module_include_always_include_names_assert_h():
     converted = convert_file_content(
         ConvertAction.MODULES,
