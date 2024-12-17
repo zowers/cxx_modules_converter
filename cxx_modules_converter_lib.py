@@ -20,6 +20,7 @@ class Options:
     def __init__(self):
         self.always_include_names = always_include_names
         self.root_dir: Path = ''
+        self.root_dir_module_name: str = ''
         self.search_path = []
 
 def filename_to_module_name(filename: str) -> str:
@@ -85,6 +86,13 @@ class FilesResolver:
         print(f'warning: file not found: "{include_filename}" referenced from "{current_filename}"')
         return include_path
 
+    def convert_filename_to_module_name(self, filename: PurePosixPath) -> str:
+        full_name = filename
+        if self.options.root_dir_module_name and self.files_map.find(filename):
+            full_name = PurePosixPath(self.options.root_dir_module_name).joinpath(filename)
+        module_name = filename_to_module_name(full_name)
+        return module_name
+
 class ModuleFilesResolver:
     def __init__(self, parent_resolver: FilesResolver, options: Options):
         self.parent_resolver: FilesResolver = parent_resolver
@@ -102,13 +110,8 @@ class ModuleFilesResolver:
 
     def resolve_include_to_module_name(self, include_filename: str) -> str:
         resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename)
-        result = self.convert_filename_to_module_name(resolved_include_filename)
+        result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
         return result
-
-    def convert_filename_to_module_name(self, filename: str) -> str:
-
-        module_name = filename_to_module_name(filename)
-        return module_name
 
 class ContentType(enum.IntEnum):
     HEADER = 1
@@ -241,7 +244,7 @@ class ModuleBaseBuilder:
 
     def set_filename(self, filename: Path):
         self.resolver.set_filename(filename)
-        self.set_module_name(self.resolver.convert_filename_to_module_name(filename))
+        self.set_module_name(self.parent_resolver.convert_filename_to_module_name(filename))
 
     def set_module_name(self, name):
         assert(not self.module_name)

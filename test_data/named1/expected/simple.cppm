@@ -1,6 +1,6 @@
 module;
 #include <vector>
-export module simple;
+export module org.simple;
 
 namespace TestNS
 {
