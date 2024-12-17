@@ -4,7 +4,7 @@
 #
 
 import argparse
-import pathlib
+from pathlib import Path
 import sys
 
 from cxx_modules_converter_lib import Converter, ConvertAction
@@ -37,19 +37,19 @@ def main(parsed_args):
     else:
         destination = parsed_args.destination
         assert(destination != parsed_args.directory)
-    directory = pathlib.Path(parsed_args.directory)
+    directory = Path(parsed_args.directory)
     converter = Converter(parsed_args.action)
     if parsed_args.parent:
         parsed_args.root = directory.parent
     if parsed_args.root:
-        root_dir = pathlib.Path(parsed_args.root)
+        root_dir = Path(parsed_args.root)
         converter.options.root_dir = root_dir
     else:
         converter.options.root_dir = directory
     for include in parsed_args.include:
         log(f'include search path: "{include}"')
         converter.options.search_path.append(include)
-    converter.convert_directory(directory, pathlib.Path(destination))
+    converter.convert_directory(directory, Path(destination))
 
 if __name__ == '__main__':
     parsed_args = parse_args()

@@ -1,7 +1,7 @@
 import enum
 import os
 import os.path
-import pathlib
+from pathlib import Path, PurePosixPath
 import re
 import shutil
 from typing import TypeAlias
@@ -19,7 +19,7 @@ always_include_names = {
 class Options:
     def __init__(self):
         self.always_include_names = always_include_names
-        self.root_dir: pathlib.Path = ''
+        self.root_dir: Path = ''
         self.search_path = []
 
 def filename_to_module_name(filename: str) -> str:
@@ -37,7 +37,7 @@ class FilesMap:
     def __init__(self):
         self.value: FilesMapDict = {}
 
-    def find(self, path: pathlib.Path) -> FilesMapDict | FileEntryType | None:
+    def find(self, path: Path) -> FilesMapDict | FileEntryType | None:
         value = self.value
         for part in path.parts:
             if not value:
@@ -45,10 +45,10 @@ class FilesMap:
             value = value.get(part, None)
         return value
 
-    def add_filesystem_directory(self, path: pathlib.Path):
+    def add_filesystem_directory(self, path: Path):
         for (root, dirs, files) in path.walk():
             relative_root = root.relative_to(path)
-            if relative_root == pathlib.Path(''):
+            if relative_root == Path(''):
                 root_node = self.value
             else:
                 parent_node = self.find(relative_root.parent)
@@ -68,8 +68,8 @@ class FilesResolver:
         self.options: Options = options
         self.files_map = FilesMap()
     
-    def resolve_in_search_path(self, current_dir: pathlib.Path, current_filename: pathlib.Path, include_filename: str) -> pathlib.PurePosixPath:
-        include_path = pathlib.PurePosixPath(include_filename)
+    def resolve_in_search_path(self, current_dir: Path, current_filename: Path, include_filename: str) -> PurePosixPath:
+        include_path = PurePosixPath(include_filename)
         # search relative to root
         if self.files_map.find(include_path):
             return include_path
@@ -79,7 +79,7 @@ class FilesResolver:
             return full_path
         # search in search_path
         for search_path_item in self.options.search_path:
-            path = pathlib.PurePosixPath(search_path_item).joinpath(include_path)
+            path = PurePosixPath(search_path_item).joinpath(include_path)
             if self.files_map.find(path):
                 return path
         print(f'warning: file not found: "{include_filename}" referenced from "{current_filename}"')
@@ -89,10 +89,10 @@ class ModuleFilesResolver:
     def __init__(self, parent_resolver: FilesResolver, options: Options):
         self.parent_resolver: FilesResolver = parent_resolver
         self.options: Options = options
-        self.module_filename: pathlib.Path = pathlib.Path()
-        self.module_dir: pathlib.Path = pathlib.Path()
+        self.module_filename: Path = Path()
+        self.module_dir: Path = Path()
 
-    def set_filename(self, filename: pathlib.Path):
+    def set_filename(self, filename: Path):
         self.module_filename = filename
         self.module_dir = self.module_filename.parent
 
@@ -239,7 +239,7 @@ class ModuleBaseBuilder:
         self.global_module_fragment_includes_count: int = 0 # count of #include <> statements
         self.flushed_global_module_fragment_includes_count: int = 0 # count of #include <> statements flushed to global module content
 
-    def set_filename(self, filename: pathlib.Path):
+    def set_filename(self, filename: Path):
         self.resolver.set_filename(filename)
         self.set_module_name(self.resolver.convert_filename_to_module_name(filename))
 
@@ -487,7 +487,7 @@ class Converter:
             case _:
                 raise RuntimeError(f'Unknown content type {content_type}')
         
-        builder.set_filename(pathlib.PurePosixPath(filename))
+        builder.set_filename(PurePosixPath(filename))
         return builder
 
     def convert_file_content_to_headers(self, content: str, filename: str, content_type: ContentType) -> str:
@@ -506,7 +506,7 @@ class Converter:
             case _:
                 raise RuntimeError(f'Unknown action: "{action}"')
 
-    def convert_file(self, source_directory: pathlib.Path, destination_directory: pathlib.Path, filename: str) -> tuple[str, ContentType]:
+    def convert_file(self, source_directory: Path, destination_directory: Path, filename: str) -> tuple[str, ContentType]:
         with open(source_directory.joinpath(filename)) as source_file:
             source_content = source_file.read()
         converted_content = self.convert_file_content(source_content, filename)
@@ -517,7 +517,7 @@ class Converter:
             destination_file.write(converted_content)
         return (converted_filename, converted_content_type)
 
-    def convert_or_copy_file(self, source_directory: pathlib.Path, destination_directory: pathlib.Path, filename: str):
+    def convert_or_copy_file(self, source_directory: Path, destination_directory: Path, filename: str):
         content_type = get_source_content_type(self.action, filename)
         if content_type == ContentType.OTHER:
             shutil.copy2(source_directory.joinpath(filename), destination_directory.joinpath(filename))
@@ -526,7 +526,7 @@ class Converter:
             (converted_filename, content_type) = self.convert_file(source_directory, destination_directory, filename)
             print('converted ', converted_filename, '\t', content_type_to_name[content_type])
 
-    def convert_directory(self, source_directory: pathlib.Path, destination_directory: pathlib.Path):
+    def convert_directory(self, source_directory: Path, destination_directory: Path):
         if self.options.root_dir and source_directory != self.options.root_dir:
             self.add_filesystem_directory(self.options.root_dir)
             self.convert_directory_impl(self.options.root_dir, destination_directory, source_directory.relative_to(self.options.root_dir))
@@ -534,11 +534,11 @@ class Converter:
             self.add_filesystem_directory(source_directory)
             self.convert_directory_impl(source_directory, destination_directory)
 
-    def add_filesystem_directory(self, directory: pathlib.Path):
+    def add_filesystem_directory(self, directory: Path):
         print('adding filesystem directory', directory)
         self.resolver.files_map.add_filesystem_directory(directory)
 
-    def convert_directory_impl(self, source_directory: pathlib.Path, destination_directory: pathlib.Path, subdir: str = None):
+    def convert_directory_impl(self, source_directory: Path, destination_directory: Path, subdir: str = None):
         source_directory_w_subdir = source_directory.joinpath(subdir or '')
         destination_directory_w_subdir = destination_directory.joinpath(subdir or '')
         destination_directory_w_subdir.mkdir(parents=True, exist_ok=True)
@@ -553,6 +553,6 @@ def convert_file_content(action: ConvertAction, content: str, filename: str) -> 
     converter = Converter(action)
     return converter.convert_file_content(content, filename)
 
-def convert_directory(action: ConvertAction, source_directory: pathlib.Path, destination_directory: pathlib.Path, subdir: str = None):
+def convert_directory(action: ConvertAction, source_directory: Path, destination_directory: Path, subdir: str = None):
     converter = Converter(action)
     return converter.convert_directory(source_directory, destination_directory)

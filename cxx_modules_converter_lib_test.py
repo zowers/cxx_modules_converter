@@ -1,5 +1,5 @@
 import os.path
-import pathlib
+from pathlib import Path, PurePosixPath
 import pytest
 from cxx_modules_converter_lib import (
     Converter,
@@ -386,15 +386,15 @@ def test_resolve_include():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('subdir/simple.cpp', ContentType.CXX)
     resolver = builder.resolver
-    assert(resolver.module_dir == pathlib.PurePosixPath('subdir'))
-    assert(resolver.resolve_include('simple.h') == pathlib.PurePosixPath('simple.h'))
+    assert(resolver.module_dir == PurePosixPath('subdir'))
+    assert(resolver.resolve_include('simple.h') == PurePosixPath('simple.h'))
 
 def test_resolve_include_no_dir():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
     resolver = builder.resolver
-    assert(resolver.module_dir == pathlib.PurePosixPath(''))
-    assert(resolver.resolve_include('simple.h') == pathlib.PurePosixPath('simple.h'))
+    assert(resolver.module_dir == PurePosixPath(''))
+    assert(resolver.resolve_include('simple.h') == PurePosixPath('simple.h'))
 
 def test_resolve_include_to_module_name():
     converter = Converter(ConvertAction.MODULES)
@@ -412,7 +412,7 @@ def test_resolver_convert_filename_to_module_name():
 
 def test_FilesMap_add_filesystem_directory():
     files_map = FilesMap()
-    files_map.add_filesystem_directory(pathlib.Path('test_data/subdirs/input'))
+    files_map.add_filesystem_directory(Path('test_data/subdirs/input'))
     assert(files_map.value == {
         'simple1.h': FileEntryType.FILE,
         'subdir1': {
@@ -424,7 +424,7 @@ def test_FilesMap_add_filesystem_directory():
             },
         },
     })
-    files_map.add_filesystem_directory(pathlib.Path('test_data/other/input'))
+    files_map.add_filesystem_directory(Path('test_data/other/input'))
     assert(files_map.value == {
         'other.txt': FileEntryType.FILE,
         'simple1.h': FileEntryType.FILE,
@@ -461,8 +461,8 @@ def test_FilesMap_add_map():
 def test_FilesResolver_resolve_in_search_path_empty_map():
     options = Options()
     files_resolver = FilesResolver(options)
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath(''), 'test', 'root.h') == pathlib.PurePosixPath('root.h'))
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'simple1.h') == pathlib.PurePosixPath('simple1.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath(''), 'test', 'root.h') == PurePosixPath('root.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'simple1.h') == PurePosixPath('simple1.h'))
 
 def test_FilesResolver_resolve_in_search_path():
     options = Options()
@@ -485,19 +485,19 @@ def test_FilesResolver_resolve_in_search_path():
         },
     })
     # check existing file from root
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir1/subdir2/simple2.h') == pathlib.PurePosixPath('subdir1/subdir2/simple2.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'subdir1/subdir2/simple2.h') == PurePosixPath('subdir1/subdir2/simple2.h'))
     # check existing file in relative subdir
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple2.h') == pathlib.PurePosixPath('subdir1/subdir2/simple2.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'subdir2/simple2.h') == PurePosixPath('subdir1/subdir2/simple2.h'))
     # check missing file
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple3.h') == pathlib.PurePosixPath('subdir2/simple3.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'subdir2/simple3.h') == PurePosixPath('subdir2/simple3.h'))
     # add search path in another dir
     options.search_path.append('dir2')
     # check file existing in relative subdir and search path
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple2.h') == pathlib.PurePosixPath('subdir1/subdir2/simple2.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'subdir2/simple2.h') == PurePosixPath('subdir1/subdir2/simple2.h'))
     # check file existing in search path but missing in relative subdir
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple3.h') == pathlib.PurePosixPath('dir2/subdir2/simple3.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'subdir2/simple3.h') == PurePosixPath('dir2/subdir2/simple3.h'))
     # check file missing in relative subdir and search path
-    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple4.h') == pathlib.PurePosixPath('subdir2/simple4.h'))
+    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'subdir2/simple4.h') == PurePosixPath('subdir2/simple4.h'))
 
 def test_module_impl_include_local_self_header_subdir():
     converter = Converter(ConvertAction.MODULES)
@@ -680,7 +680,7 @@ def dir_simple(tmp_path_factory):
     path = tmp_path_factory.mktemp("simple")
     return path
 
-def assert_files(expected_dir: pathlib.Path, result_dir: pathlib.Path, expected_files: list[str]):
+def assert_files(expected_dir: Path, result_dir: Path, expected_files: list[str]):
     for filename in expected_files:
         result_path = result_dir.joinpath(filename)
         print('assert_files filename:', filename)
@@ -691,24 +691,24 @@ def assert_files(expected_dir: pathlib.Path, result_dir: pathlib.Path, expected_
             result_content = result_file.read()
         assert(result_content == expected_content)
 
-def test_dir_simple(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/simple')
+def test_dir_simple(dir_simple: Path):
+    data_directory = Path('test_data/simple')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'simple.cppm',
         'simple.cpp',
     ])
 
-def test_dir_named1(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/simple')
+def test_dir_named1(dir_simple: Path):
+    data_directory = Path('test_data/simple')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'simple.cppm',
         'simple.cpp',
     ])
 
-def test_dir_prefix(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/prefix')
+def test_dir_prefix(dir_simple: Path):
+    data_directory = Path('test_data/prefix')
     converter = Converter(ConvertAction.MODULES)
     input_dir = data_directory.joinpath('input')
     converter.options.root_dir = input_dir
@@ -718,31 +718,31 @@ def test_dir_prefix(dir_simple: pathlib.Path):
         'subdir/simple.cpp',
     ])
 
-def test_dir_other(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/other')
+def test_dir_other(dir_simple: Path):
+    data_directory = Path('test_data/other')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'other.txt',
     ])
 
-def test_dir_two(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/two')
+def test_dir_two(dir_simple: Path):
+    data_directory = Path('test_data/two')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'simple1.cppm',
         'simple2.cppm',
     ])
 
-def test_dir_subdir(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/subdir')
+def test_dir_subdir(dir_simple: Path):
+    data_directory = Path('test_data/subdir')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'subdir1/simple1.cppm',
         'subdir1/simple2.cppm',
     ])
 
-def test_dir_subdirs(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/subdirs')
+def test_dir_subdirs(dir_simple: Path):
+    data_directory = Path('test_data/subdirs')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'simple1.cppm',
@@ -752,8 +752,8 @@ def test_dir_subdirs(dir_simple: pathlib.Path):
         'subdir1/subdir2/simple2.cppm',
     ])
 
-def test_dir_subdirs_rooted(dir_simple: pathlib.Path):
-    data_directory = pathlib.Path('test_data/subdirs_rooted')
+def test_dir_subdirs_rooted(dir_simple: Path):
+    data_directory = Path('test_data/subdirs_rooted')
     converter = Converter(ConvertAction.MODULES)
     input_dir = data_directory.joinpath('input')
     converter.options.root_dir = input_dir
