@@ -7,6 +7,11 @@ from cxx_modules_converter_lib import (
     convert_directory,
     ConvertAction,
     ContentType,
+    FilesMap,
+    FileEntryType,
+    Options,
+    FilesResolver,
+    ModuleFilesResolver,
     )
 
 def test_module_empty():
@@ -377,31 +382,131 @@ def test_module_impl_include_self_header():
 '''module simple;
 ''')
 
-def test_module_impl_include_local_self_header_prefix():
-    converter = Converter(ConvertAction.MODULES)
-    converted = converter.convert_file_content(
-'''#include "simple.h"
-#include "local_include.h"
-''', 'prefix/simple.cpp')
-    assert(converted == 
-'''module prefix.simple;
-import prefix.local_include;
-''')
-
 def test_resolve_include():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('subdir/simple.cpp', ContentType.CXX)
-    assert(builder.module_dir == pathlib.PurePosixPath('subdir'))
-    assert(builder.resolve_include('simple.h') == pathlib.PurePosixPath('subdir/simple.h'))
+    resolver = builder.resolver
+    assert(resolver.module_dir == pathlib.PurePosixPath('subdir'))
+    assert(resolver.resolve_include('simple.h') == pathlib.PurePosixPath('simple.h'))
 
 def test_resolve_include_no_dir():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
-    assert(builder.module_dir == pathlib.PurePosixPath(''))
-    assert(builder.resolve_include('simple.h') == pathlib.PurePosixPath('simple.h'))
+    resolver = builder.resolver
+    assert(resolver.module_dir == pathlib.PurePosixPath(''))
+    assert(resolver.resolve_include('simple.h') == pathlib.PurePosixPath('simple.h'))
+
+def test_resolve_include_to_module_name():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    assert(resolver.resolve_include_to_module_name('simple.h') == 'simple')
+    assert(resolver.resolve_include_to_module_name('subdir/simple.h') == 'subdir.simple')
+
+def test_resolver_convert_filename_to_module_name():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    assert(resolver.convert_filename_to_module_name('simple.cpp') == 'simple')
+    assert(resolver.convert_filename_to_module_name('subdir/simple.cpp') == 'subdir.simple')
+
+def test_FilesMap_add_filesystem_directory():
+    files_map = FilesMap()
+    files_map.add_filesystem_directory(pathlib.Path('test_data/subdirs/input'))
+    assert(files_map.value == {
+        'simple1.h': FileEntryType.FILE,
+        'subdir1': {
+            'simple1.h': FileEntryType.FILE,
+            'simple2.h': FileEntryType.FILE,
+            'subdir2': {
+                'simple1.h': FileEntryType.FILE,
+                'simple2.h': FileEntryType.FILE,
+            },
+        },
+    })
+    files_map.add_filesystem_directory(pathlib.Path('test_data/other/input'))
+    assert(files_map.value == {
+        'other.txt': FileEntryType.FILE,
+        'simple1.h': FileEntryType.FILE,
+        'subdir1': {
+            'simple1.h': FileEntryType.FILE,
+            'simple2.h': FileEntryType.FILE,
+            'subdir2': {
+                'simple1.h': FileEntryType.FILE,
+                'simple2.h': FileEntryType.FILE,
+            },
+        },
+    })
+
+def test_FilesMap_add_map():
+    files_map = FilesMap()
+    files_map.add_files_map_dict({
+        'simple1.h': FileEntryType.FILE,
+    })
+    assert(files_map.value == {
+        'simple1.h': FileEntryType.FILE,
+    })
+    files_map.add_files_map_dict({
+        'subdir1': {
+            'simple2.h': FileEntryType.FILE,
+        },
+    })
+    assert(files_map.value == {
+        'simple1.h': FileEntryType.FILE,
+        'subdir1': {
+            'simple2.h': FileEntryType.FILE,
+        },
+    })
+
+def test_FilesResolver_resolve_in_search_path_empty_map():
+    options = Options()
+    files_resolver = FilesResolver(options)
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath(''), 'test', 'root.h') == pathlib.PurePosixPath('root.h'))
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'simple1.h') == pathlib.PurePosixPath('simple1.h'))
+
+def test_FilesResolver_resolve_in_search_path():
+    options = Options()
+    files_resolver = FilesResolver(options)
+    files_map = files_resolver.files_map
+    files_map.add_files_map_dict({
+        'root.h': FileEntryType.FILE,
+        'subdir1': {
+            'simple1.h': FileEntryType.FILE,
+            'subdir2': {
+                'simple2.h': FileEntryType.FILE,
+            },
+        },
+        'dir2': {
+            'simple1.h': FileEntryType.FILE,
+            'subdir2': {
+                'simple2.h': FileEntryType.FILE,
+                'simple3.h': FileEntryType.FILE,
+            },
+        },
+    })
+    # check existing file from root
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir1/subdir2/simple2.h') == pathlib.PurePosixPath('subdir1/subdir2/simple2.h'))
+    # check existing file in relative subdir
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple2.h') == pathlib.PurePosixPath('subdir1/subdir2/simple2.h'))
+    # check missing file
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple3.h') == pathlib.PurePosixPath('subdir2/simple3.h'))
+    # add search path in another dir
+    options.search_path.append('dir2')
+    # check file existing in relative subdir and search path
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple2.h') == pathlib.PurePosixPath('subdir1/subdir2/simple2.h'))
+    # check file existing in search path but missing in relative subdir
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple3.h') == pathlib.PurePosixPath('dir2/subdir2/simple3.h'))
+    # check file missing in relative subdir and search path
+    assert(files_resolver.resolve_in_search_path(pathlib.PurePosixPath('subdir1'), 'test', 'subdir2/simple4.h') == pathlib.PurePosixPath('subdir2/simple4.h'))
 
 def test_module_impl_include_local_self_header_subdir():
     converter = Converter(ConvertAction.MODULES)
+    converter.resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'local_include.h': FileEntryType.FILE,
+            'simple.h': FileEntryType.FILE,
+        },
+    })
     converted = converter.convert_file_content(
 '''#include "simple.h"
 #include "local_include.h"
@@ -413,6 +518,14 @@ import subdir.local_include;
 
 def test_module_impl_include_local_self_header_subdir_prefix():
     converter = Converter(ConvertAction.MODULES)
+    converter.resolver.files_map.add_files_map_dict({
+        'prefix': {
+            'subdir': {
+                'local_include.h': FileEntryType.FILE,
+                'simple.h': FileEntryType.FILE,
+            },
+        },
+    })
     converted = converter.convert_file_content(
 '''#include "simple.h"
 #include "local_include.h"
@@ -586,6 +699,14 @@ def test_dir_simple(dir_simple: pathlib.Path):
         'simple.cpp',
     ])
 
+def test_dir_named1(dir_simple: pathlib.Path):
+    data_directory = pathlib.Path('test_data/simple')
+    convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.cppm',
+        'simple.cpp',
+    ])
+
 def test_dir_prefix(dir_simple: pathlib.Path):
     data_directory = pathlib.Path('test_data/prefix')
     converter = Converter(ConvertAction.MODULES)
@@ -641,6 +762,8 @@ def test_dir_subdirs_rooted(dir_simple: pathlib.Path):
         'subdir/simple1.cppm',
         'subdir/subdir1/simple1.cppm',
         'subdir/subdir1/simple2.cppm',
+        'subdir/subdir1/use_relative_include.cppm',
+        'subdir/subdir1/use_relative_include_missing.cppm',
         'subdir/subdir1/subdir2/simple1.cppm',
         'subdir/subdir1/subdir2/simple1.cpp',
         'subdir/subdir1/subdir2/simple2.cppm',

@@ -20,6 +20,95 @@ class Options:
     def __init__(self):
         self.always_include_names = always_include_names
         self.root_dir: pathlib.Path = ''
+        self.search_path = []
+
+def filename_to_module_name(filename: str) -> str:
+    parts = os.path.splitext(filename)
+    result = parts[0].replace('/', '.').replace('\\', '.')
+    return result
+
+class FileEntryType(enum.IntEnum):
+    FILE = 1
+    DIR = 2
+
+FilesMapDict: TypeAlias = dict[str, dict]
+
+class FilesMap:
+    def __init__(self):
+        self.value: FilesMapDict = {}
+
+    def find(self, path: pathlib.Path) -> FilesMapDict | FileEntryType | None:
+        value = self.value
+        for part in path.parts:
+            if not value:
+                break
+            value = value.get(part, None)
+        return value
+
+    def add_filesystem_directory(self, path: pathlib.Path):
+        for (root, dirs, files) in path.walk():
+            relative_root = root.relative_to(path)
+            if relative_root == pathlib.Path(''):
+                root_node = self.value
+            else:
+                parent_node = self.find(relative_root.parent)
+                parent_node[relative_root.name] = {}
+                root_node = parent_node[relative_root.name]
+
+            for name in dirs:
+                root_node[name] = {}
+            for name in files:
+                root_node[name] = FileEntryType.FILE
+    
+    def add_files_map_dict(self, other: FilesMapDict):
+        self.value.update(other)
+
+class FilesResolver:
+    def __init__(self, options: Options):
+        self.options: Options = options
+        self.files_map = FilesMap()
+    
+    def resolve_in_search_path(self, current_dir: pathlib.Path, current_filename: pathlib.Path, include_filename: str) -> pathlib.PurePosixPath:
+        include_path = pathlib.PurePosixPath(include_filename)
+        # search relative to root
+        if self.files_map.find(include_path):
+            return include_path
+        # search relative to current_dir
+        full_path = current_dir.joinpath(include_path)
+        if self.files_map.find(full_path):
+            return full_path
+        # search in search_path
+        for search_path_item in self.options.search_path:
+            path = pathlib.PurePosixPath(search_path_item).joinpath(include_path)
+            if self.files_map.find(path):
+                return path
+        print(f'warning: file not found: "{include_filename}" referenced from "{current_filename}"')
+        return include_path
+
+class ModuleFilesResolver:
+    def __init__(self, parent_resolver: FilesResolver, options: Options):
+        self.parent_resolver: FilesResolver = parent_resolver
+        self.options: Options = options
+        self.module_filename: pathlib.Path = pathlib.Path()
+        self.module_dir: pathlib.Path = pathlib.Path()
+
+    def set_filename(self, filename: pathlib.Path):
+        self.module_filename = filename
+        self.module_dir = self.module_filename.parent
+
+    def resolve_include(self, include_filename: str) -> str:
+        result = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename)
+        return result
+
+    def resolve_include_to_module_name(self, include_filename: str) -> str:
+        resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename)
+        result = self.convert_filename_to_module_name(resolved_include_filename)
+        return result
+
+    def convert_filename_to_module_name(self, filename: str) -> str:
+
+        module_name = filename_to_module_name(filename)
+        return module_name
 
 class ContentType(enum.IntEnum):
     HEADER = 1
@@ -130,10 +219,10 @@ preprocessor_other_rx = re.compile(r'''^\s*#\s*(error|elif|else|pragma|warning).
 class ModuleBaseBuilder:
     module_purview_start_prefix: str = ''   # 'module' or 'export module' - overriden in implementation classes
 
-    def __init__(self, options: Options):
+    def __init__(self, options: Options, parent_resolver: FilesResolver):
         self.options: Options = options
-        self.module_filename: pathlib.Path = pathlib.Path()
-        self.module_dir: pathlib.Path = pathlib.Path()
+        self.parent_resolver: FilesResolver = parent_resolver
+        self.resolver: ModuleFilesResolver = ModuleFilesResolver(self.parent_resolver, self.options)
         self.module_name: str = ''                   # name of the module
         self.file_copyright: StrList = []            # // File copyright
         self.global_module_fragment_start: str = ''  # module;
@@ -151,8 +240,8 @@ class ModuleBaseBuilder:
         self.flushed_global_module_fragment_includes_count: int = 0 # count of #include <> statements flushed to global module content
 
     def set_filename(self, filename: pathlib.Path):
-        self.module_filename = filename
-        self.module_dir = self.module_filename.parent
+        self.resolver.set_filename(filename)
+        self.set_module_name(self.resolver.convert_filename_to_module_name(filename))
 
     def set_module_name(self, name):
         assert(not self.module_name)
@@ -244,23 +333,12 @@ class ModuleBaseBuilder:
             self.add_module_content(line)
             return
         
-        resolved_include_filename = self.resolve_include(line_include_filename)
-
-        line_module_name = filename_to_module_name(resolved_include_filename)
+        line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename)
         if line_module_name == self.module_name:
             return None
         import_line = f'{line_space1}{line_space2}import {line_module_name};{line_tail}'
         self.add_module_content(import_line)
     
-    def resolve_include(self, include_filename: str) -> str:
-        include_path = pathlib.PurePosixPath(include_filename)
-        path_components = include_path.parts
-        if len(path_components) == 1:
-            # directory same as module
-            resolved_include_path = self.module_dir.joinpath(include_path)
-            return resolved_include_path
-        return include_filename
-
     def build_result(self):
         assert(bool(self.global_module_fragment_start) == bool(self.global_module_fragment))
         if self.flushed_module_preprocessor_nesting_count != 0:
@@ -319,11 +397,6 @@ module <name>;             // Start of module purview.
     '''
     module_purview_start_prefix: str = 'module'
 
-def filename_to_module_name(filename: str) -> str:
-    parts = os.path.splitext(filename)
-    result = parts[0].replace('/', '.').replace('\\', '.')
-    return result
-
 class HeaderScanState(enum.IntEnum):
     START = enum.auto()
     FILE_COMMENT = enum.auto()
@@ -343,6 +416,7 @@ class Converter:
     def __init__(self, action: ConvertAction):
         self.action = action
         self.options = Options()
+        self.resolver = FilesResolver(self.options)
     
     def convert_file_content_to_module(self, content: str, filename: str, content_type: ContentType) -> str:
         if content_type in {ContentType.MODULE_INTERFACE, ContentType.MODULE_IMPL}:
@@ -407,14 +481,13 @@ class Converter:
     def make_builder_to_module(self, filename: str, content_type: ContentType) -> ModuleBaseBuilder:
         match content_type:
             case ContentType.HEADER:
-                builder = ModuleInterfaceUnitBuilder(self.options)
+                builder = ModuleInterfaceUnitBuilder(self.options, self.resolver)
             case ContentType.CXX:
-                builder = ModuleImplUnitBuilder(self.options)
+                builder = ModuleImplUnitBuilder(self.options, self.resolver)
             case _:
                 raise RuntimeError(f'Unknown content type {content_type}')
         
         builder.set_filename(pathlib.PurePosixPath(filename))
-        builder.set_module_name(filename_to_module_name(filename))
         return builder
 
     def convert_file_content_to_headers(self, content: str, filename: str, content_type: ContentType) -> str:
@@ -455,9 +528,15 @@ class Converter:
 
     def convert_directory(self, source_directory: pathlib.Path, destination_directory: pathlib.Path):
         if self.options.root_dir and source_directory != self.options.root_dir:
+            self.add_filesystem_directory(self.options.root_dir)
             self.convert_directory_impl(self.options.root_dir, destination_directory, source_directory.relative_to(self.options.root_dir))
         else:
+            self.add_filesystem_directory(source_directory)
             self.convert_directory_impl(source_directory, destination_directory)
+
+    def add_filesystem_directory(self, directory: pathlib.Path):
+        print('adding filesystem directory', directory)
+        self.resolver.files_map.add_filesystem_directory(directory)
 
     def convert_directory_impl(self, source_directory: pathlib.Path, destination_directory: pathlib.Path, subdir: str = None):
         source_directory_w_subdir = source_directory.joinpath(subdir or '')

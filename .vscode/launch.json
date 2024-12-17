@@ -20,7 +20,7 @@
             "request": "launch",
             "program": "cxx_modules_converter.py",
             "console": "integratedTerminal",
-            "args": "-s ~/project/cxx_modules_converter_other_test_data/Utils -d test_data/Utils/result --dir_prefix"
+            "args": "-s ~/project/cxx_modules_converter_other_test_data/Utils -d result --parent"
         },
     ]
 }

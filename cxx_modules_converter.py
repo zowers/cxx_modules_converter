@@ -23,6 +23,7 @@ def parse_args(argv: list[str] = None):
                         help='action to perform - convert to modules or headers')
     parser.add_argument('-r', '--root', default=directory, help='resolve module names starting from this root directory, ignored when --parent')
     parser.add_argument('-p', '--parent', action='store_true', default=False, help='resolve module names starting from parent of source directory')
+    parser.add_argument('-I', '--include', action='append', default=[], help='include search path, starting from root or parent directory')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
@@ -45,6 +46,9 @@ def main(parsed_args):
         converter.options.root_dir = root_dir
     else:
         converter.options.root_dir = directory
+    for include in parsed_args.include:
+        log(f'include search path: "{include}"')
+        converter.options.search_path.append(include)
     converter.convert_directory(directory, pathlib.Path(destination))
 
 if __name__ == '__main__':
