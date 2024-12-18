@@ -197,7 +197,7 @@ LineList: TypeAlias = list[Line]
 # regex: spaces only
 spaces_rx = re.compile(r'''^\s*$''')
 # regex: #include <system_header>
-preprocessor_include_system_rx = re.compile(r'''^(\s*)#(\s*)include\s*<(.+)>(.*)$''')
+preprocessor_include_system_rx = re.compile(r'''^(\s*)#(\s*)(include|import)\s*<(.+)>(.*)$''')
 # regex: #include "local_header.h"
 preprocessor_include_local_rx = re.compile(r'''^(\s*)#(\s*)include\s*"(.+)"(.*)$''')
 # regex: line comment
