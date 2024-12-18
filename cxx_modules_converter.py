@@ -29,7 +29,7 @@ def parse_args(argv: list[str] = None):
     return parsed_args
 
 def log(message):
-    print('cxx_modules_converter:', message, file=sys.stderr)
+    print('cxx_modules_converter:', message)
 
 def main(parsed_args):
     log(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {'inplace' if parsed_args.inplace else ' into ' + parsed_args.destination}')
@@ -52,6 +52,7 @@ def main(parsed_args):
         log(f'include search path: "{include}"')
         converter.options.search_path.append(include)
     converter.convert_directory(directory, Path(destination))
+    log('done')
 
 if __name__ == '__main__':
     parsed_args = parse_args()

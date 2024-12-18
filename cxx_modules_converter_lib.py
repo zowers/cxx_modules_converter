@@ -530,7 +530,7 @@ class Converter:
             print('converted ', converted_filename, '\t', content_type_to_name[content_type])
 
     def convert_directory(self, source_directory: Path, destination_directory: Path):
-        if self.options.root_dir and source_directory != self.options.root_dir:
+        if self.options.root_dir and self.options.root_dir != Path() and source_directory != self.options.root_dir:
             self.add_filesystem_directory(self.options.root_dir)
             self.convert_directory_impl(self.options.root_dir, destination_directory, source_directory.relative_to(self.options.root_dir))
         else:
