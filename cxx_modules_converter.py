@@ -25,6 +25,7 @@ def parse_args(argv: list[str] = None):
     parser.add_argument('-p', '--parent', action='store_true', default=False, help='resolve module names starting from parent of source directory')
     parser.add_argument('-I', '--include', action='append', default=[], help='include search path, starting from root or parent directory')
     parser.add_argument('-n', '--name', default='', help='module name for modules in [root] directory which prefixes all modules')
+    parser.add_argument('-k', '--skip', action='append', default=[], help='skip patterns - files and directories matching any pattern will not be converted or copied')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
@@ -51,6 +52,9 @@ def main(parsed_args):
     for include in parsed_args.include:
         log(f'include search path: "{include}"')
         converter.options.search_path.append(include)
+    for skip_pattern in parsed_args.skip:
+        log(f'skip pattern: "{skip_pattern}"')
+        converter.options.skip_patterns.append(skip_pattern)
     converter.convert_directory(directory, Path(destination))
     log('done')
 

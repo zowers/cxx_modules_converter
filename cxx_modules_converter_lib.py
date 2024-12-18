@@ -22,6 +22,7 @@ class Options:
         self.root_dir: Path = ''
         self.root_dir_module_name: str = ''
         self.search_path = []
+        self.skip_patterns: list[str] = []
 
 def filename_to_module_name(filename: str) -> str:
     parts = os.path.splitext(filename)
@@ -547,10 +548,20 @@ class Converter:
         destination_directory_w_subdir.mkdir(parents=True, exist_ok=True)
         for filepath in source_directory_w_subdir.iterdir():
             filename = filepath.relative_to(source_directory)
+            if any_pattern_maches(self.options.skip_patterns, filename):
+                print(f'skipping "f{filename}"')
+                continue
             if filepath.is_file():
                 self.convert_or_copy_file(source_directory, destination_directory, filename)
             if filepath.is_dir():
                 self.convert_directory_impl(source_directory, destination_directory, filename)
+
+def any_pattern_maches(patterns: list[str], filename: Path) -> bool:
+    for skip_pattern in patterns:
+        if filename.match(skip_pattern):
+            print(f'skipping "f{filename}"')
+            return True
+    return False
 
 def convert_file_content(action: ConvertAction, content: str, filename: str) -> str:
     converter = Converter(action)

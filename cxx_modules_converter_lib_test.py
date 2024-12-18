@@ -704,12 +704,19 @@ class TestClass
 } // namespace TestNS
 ''')
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def dir_simple(tmp_path_factory):
     path = tmp_path_factory.mktemp("simple")
     return path
 
 def assert_files(expected_dir: Path, result_dir: Path, expected_files: list[str]):
+    result_files = set()
+    for (root, dirs, files) in result_dir.walk():
+        relative_root = root.relative_to(result_dir)
+        for name in files:
+            result_files.add(relative_root.joinpath(name).as_posix())
+    assert(result_files == set(expected_files))
+
     for filename in expected_files:
         result_path = result_dir.joinpath(filename)
         print('assert_files filename:', filename)
@@ -787,6 +794,19 @@ def test_dir_subdir(dir_simple: Path):
         'subdir1/simple2.cppm',
     ])
 
+def test_dir_skip(dir_simple: Path):
+    data_directory = Path('test_data/skip')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.skip_patterns = [
+        'skipdir',
+        'subdir1/simple2.h',
+        'subdir1/skipsubdir',
+    ]
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'subdir1/simple1.cppm',
+    ])
+
 def test_dir_subdirs(dir_simple: Path):
     data_directory = Path('test_data/subdirs')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
@@ -810,6 +830,7 @@ def test_dir_subdirs_rooted(dir_simple: Path):
         'subdir/subdir1/simple2.cppm',
         'subdir/subdir1/use_relative_include.cppm',
         'subdir/subdir1/use_relative_include_missing.cppm',
+        'subdir/subdir1/use_search_path_include_existing.cppm',
         'subdir/subdir1/subdir2/simple1.cppm',
         'subdir/subdir1/subdir2/simple1.cpp',
         'subdir/subdir1/subdir2/simple2.cppm',
