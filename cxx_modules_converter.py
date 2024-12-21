@@ -7,7 +7,11 @@ import argparse
 from pathlib import Path
 import sys
 
-from cxx_modules_converter_lib import Converter, ConvertAction
+from cxx_modules_converter_lib import (
+    Converter, 
+    ConvertAction,
+    COMPAT_MACRO_DEFAULT,
+)
 
 def parse_args(argv: list[str] = None):
     parser = argparse.ArgumentParser(
@@ -26,6 +30,10 @@ def parse_args(argv: list[str] = None):
     parser.add_argument('-I', '--include', action='append', default=[], help='include search path, starting from root or parent directory')
     parser.add_argument('-n', '--name', default='', help='module name for modules in [root] directory which prefixes all modules')
     parser.add_argument('-k', '--skip', action='append', default=[], help='skip patterns - files and directories matching any pattern will not be converted or copied')
+    parser.add_argument('-c', '--compat', action='append', default=[],
+                        help='compat patterns - files and directories matching any pattern'
+                        + ' will be converted in compatibility mode allowing to use as either module or header')
+    parser.add_argument('-m', '--compat-macro', default=COMPAT_MACRO_DEFAULT, help='compatibility macro name used in compat modules and headers')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
@@ -33,7 +41,8 @@ def log(message):
     print('cxx_modules_converter:', message)
 
 def main(parsed_args):
-    log(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {'inplace' if parsed_args.inplace else ' into ' + parsed_args.destination}')
+    log_messages = []
+    log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {'inplace' if parsed_args.inplace else ' into ' + parsed_args.destination}')
     if parsed_args.inplace:
         destination = parsed_args.directory
     else:
@@ -50,13 +59,20 @@ def main(parsed_args):
         converter.options.root_dir = directory
     converter.options.root_dir_module_name = parsed_args.name
     for include in parsed_args.include:
-        log(f'include search path: "{include}"')
+        log_messages.append(f'include search path: "{include}"')
         converter.options.search_path.append(include)
     for skip_pattern in parsed_args.skip:
-        log(f'skip pattern: "{skip_pattern}"')
+        log_messages.append(f'skip pattern: "{skip_pattern}"')
         converter.options.skip_patterns.append(skip_pattern)
+    for compat_pattern in parsed_args.compat:
+        log_messages.append(f'compat pattern: "{compat_pattern}"')
+        converter.options.compat_patterns.append(compat_pattern)
+    if parsed_args.compat_macro:
+        converter.options.compat_macro = parsed_args.compat_macro;
+    log_text = '\n'.join(log_messages)
+    log(log_text)
     converter.convert_directory(directory, Path(destination))
-    log('done')
+    log('done ' + log_text)
 
 if __name__ == '__main__':
     parsed_args = parse_args()

@@ -10,8 +10,11 @@ from cxx_modules_converter_lib import (
     FilesMap,
     FileEntryType,
     Options,
+    FileOptions,
     FilesResolver,
     ModuleFilesResolver,
+    ContentType,
+    FileContent,
     )
 
 def test_module_empty():
@@ -540,7 +543,7 @@ def test_module_impl_include_local_self_header_subdir():
 '''#include "simple.h"
 #include "local_include.h"
 ''', 'subdir/simple.cpp')
-    assert(converted == 
+    assert(converted[0].content == 
 '''module subdir.simple;
 import subdir.local_include;
 ''')
@@ -559,7 +562,7 @@ def test_module_impl_include_local_self_header_subdir_prefix():
 '''#include "simple.h"
 #include "local_include.h"
 ''', 'prefix/subdir/simple.cpp')
-    assert(converted == 
+    assert(converted[0].content == 
 '''module prefix.subdir.simple;
 import prefix.subdir.local_include;
 ''')
@@ -704,6 +707,42 @@ class TestClass
 } // namespace TestNS
 ''')
 
+def test_module_interface_compat_header():
+    converter = Converter(ConvertAction.MODULES)
+    file_options = FileOptions()
+    file_options.convert_as_compat = True
+    converted = converter.convert_file_content(
+'''#include "local_include.h"
+''', 'simple.h', file_options)
+    assert(converted == [
+        FileContent("simple.cppm", ContentType.MODULE_INTERFACE,
+'''export module simple;
+import local_include;
+'''),
+        FileContent("simple.h", ContentType.HEADER,
+'''#pragma once
+#ifndef CXX_COMPAT_HEADER
+#define CXX_COMPAT_HEADER
+#endif
+#include "simple.cppm"
+'''),
+])
+
+def test_module_impl_compat():
+    converter = Converter(ConvertAction.MODULES)
+    file_options = FileOptions()
+    file_options.convert_as_compat = True
+    converted = converter.convert_file_content(
+'''#include "local_include.h"
+''', 'simple.cpp', file_options)
+    assert(converted == [
+        FileContent("simple.cpp", ContentType.MODULE_IMPL,
+'''module simple;
+import local_include;
+'''),
+])
+
+
 @pytest.fixture(scope="function")
 def dir_simple(tmp_path_factory):
     path = tmp_path_factory.mktemp("simple")
@@ -769,6 +808,24 @@ def test_dir_prefix_named(dir_simple: Path):
         'subdir/local_include.cppm',
         'subdir/simple.cppm',
         'subdir/simple.cpp',
+    ])
+
+def test_dir_compat(dir_simple: Path):
+    data_directory = Path('test_data/compat')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.compat_patterns = [
+        'simple.h',
+        'simple.cpp',
+        'subdir/*',
+    ]
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.h',
+        'simple.cppm',
+        'simple.cpp',
+        'subdir/simple2.h',
+        'subdir/simple2.cppm',
+        'subdir/simple2.cpp',
     ])
 
 def test_dir_other(dir_simple: Path):

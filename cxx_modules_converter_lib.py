@@ -1,3 +1,4 @@
+import copy
 import enum
 import os
 import os.path
@@ -16,6 +17,8 @@ always_include_names = {
     'assert.h',
 }
 
+COMPAT_MACRO_DEFAULT: str = "CXX_COMPAT_HEADER"
+
 class Options:
     def __init__(self):
         self.always_include_names = always_include_names
@@ -23,6 +26,12 @@ class Options:
         self.root_dir_module_name: str = ''
         self.search_path = []
         self.skip_patterns: list[str] = []
+        self.compat_patterns: list[str] = []
+        self.compat_macro: str = COMPAT_MACRO_DEFAULT
+
+class FileOptions:
+    def __init__(self):
+        self.convert_as_compat: bool = False
 
 def filename_to_module_name(filename: str) -> str:
     parts = os.path.splitext(filename)
@@ -180,6 +189,20 @@ def convert_filename_to_content_type(filename: str, content_type: ContentType):
     new_filename = parts[0] + new_extension
     return new_filename
 
+class FileContent:
+    def __init__(self, filename: str, content_type: ContentType, content: str):
+        self.filename: str = filename
+        self.content_type: ContentType = content_type
+        self.content: str = content
+
+    def __repr__(self):
+        return str(self.__dict__)
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+FileContentList: TypeAlias = list[FileContent]
+
 StrList: TypeAlias = list[str]
 new_line = '\n'
 
@@ -220,11 +243,32 @@ preprocessor_define_rx = re.compile(r'''^\s*#\s*define.*$''')
 # regex: #warning
 preprocessor_other_rx = re.compile(r'''^\s*#\s*(error|elif|else|pragma|warning).*$''')
 
-class ModuleBaseBuilder:
+class FileBaseBuilder:
+    content_type: ContentType = None
+
+    def __init__(self, options: Options):
+        self.options: Options = options
+        self.source_filename: Path = None
+
+    def set_source_filename(self, source_filename: Path):
+        self.source_filename = source_filename
+
+    def converted_filename(self) -> str:
+        return convert_filename_to_content_type(self.source_filename, self.content_type)
+
+    def build_result(self) -> str:
+        raise NotImplementedError('build_result')
+
+    def build_file_content(self) -> FileContent:
+        content = self.build_result()
+        return FileContent(self.converted_filename(), self.content_type, content)
+
+class ModuleBaseBuilder(FileBaseBuilder):
     module_purview_start_prefix: str = ''   # 'module' or 'export module' - overriden in implementation classes
+    content_type: ContentType = None
 
     def __init__(self, options: Options, parent_resolver: FilesResolver):
-        self.options: Options = options
+        super().__init__(options)
         self.parent_resolver: FilesResolver = parent_resolver
         self.resolver: ModuleFilesResolver = ModuleFilesResolver(self.parent_resolver, self.options)
         self.module_name: str = ''                   # name of the module
@@ -243,7 +287,8 @@ class ModuleBaseBuilder:
         self.global_module_fragment_includes_count: int = 0 # count of #include <> statements
         self.flushed_global_module_fragment_includes_count: int = 0 # count of #include <> statements flushed to global module content
 
-    def set_filename(self, filename: Path):
+    def set_source_filename(self, filename: Path):
+        super().set_source_filename(filename)
         self.resolver.set_filename(filename)
         self.set_module_name(self.parent_resolver.convert_filename_to_module_name(filename))
 
@@ -278,6 +323,9 @@ class ModuleBaseBuilder:
         self.flushed_global_module_fragment_includes_count = self.global_module_fragment_includes_count
         self.global_module_fragment_includes_count = 0
         self._flush_module_staging()
+
+    def add_system_include(self, line):
+        self.add_global_module_fragment(line)
 
     def add_global_module_fragment(self, line):
         self.global_module_fragment_includes_count += 1
@@ -316,6 +364,9 @@ class ModuleBaseBuilder:
         self.module_staging = []
         self.flushed_module_preprocessor_nesting_count = self.preprocessor_nesting_count
         self.flushed_global_module_fragment_includes_count = 0
+
+    def add_local_include(self, line: str, match: re.Match = None):
+        self.add_module_import_from_include(line, match)
 
     def add_module_import_from_include(self, line: str, match: re.Match = None):
         if not self.module_purview_start:
@@ -362,6 +413,7 @@ class ModuleBaseBuilder:
         return new_line.join(parts) + new_line
 
 class ModuleInterfaceUnitBuilder(ModuleBaseBuilder):
+    content_type = ContentType.MODULE_INTERFACE
     '''
 // Module interface unit.
 
@@ -384,6 +436,7 @@ export module <name>;      // Start of module purview.
     module_purview_start_prefix: str = 'export module'
 
 class ModuleImplUnitBuilder(ModuleBaseBuilder):
+    content_type = ContentType.MODULE_IMPL
     '''
 // Module implementation unit.
 
@@ -400,6 +453,29 @@ module <name>;             // Start of module purview.
 <module implementation>
     '''
     module_purview_start_prefix: str = 'module'
+
+class CompatHeaderBuilder(FileBaseBuilder):
+    content_type = ContentType.HEADER
+    def __init__(self, options: Options, module_builder: ModuleBaseBuilder):
+        super().__init__(options)
+        self.module_builder: ModuleBaseBuilder = module_builder
+        assert(module_builder.content_type == ContentType.MODULE_INTERFACE)
+        module_interface_unit_filename: str = module_builder.converted_filename()
+        assert(module_interface_unit_filename)
+        self.relative_module_interface_unit_filename: str = os.path.basename(module_interface_unit_filename)
+
+    def build_result(self) -> str:
+        compat_macro = self.options.compat_macro
+        assert(compat_macro)
+        relative_module_interface_unit_filename = self.relative_module_interface_unit_filename
+        parts = [
+            f'''#pragma once''',
+            f'''#ifndef {compat_macro}''',
+            f'''#define {compat_macro}''',
+            f'''#endif''',
+            f'''#include "{relative_module_interface_unit_filename}"''',
+        ]
+        return new_line.join(parts) + new_line
 
 class HeaderScanState(enum.IntEnum):
     START = enum.auto()
@@ -422,9 +498,9 @@ class Converter:
         self.options = Options()
         self.resolver = FilesResolver(self.options)
     
-    def convert_file_content_to_module(self, content: str, filename: str, content_type: ContentType) -> str:
+    def convert_file_content_to_module(self, content: str, filename: str, content_type: ContentType, file_options: FileOptions) -> FileContentList:
         if content_type in {ContentType.MODULE_INTERFACE, ContentType.MODULE_IMPL}:
-            return content
+            return [FileContent(filename, content_type, content)]
         content_lines = content.splitlines()
 
         builder = self.make_builder_to_module(filename, content_type)
@@ -461,9 +537,9 @@ class Converter:
                 case HeaderScanState.MAIN:
                     m = Matcher()
                     if m.match(preprocessor_include_system_rx, line):
-                        builder.add_global_module_fragment(line)
+                        builder.add_system_include(line)
                     elif m.match(preprocessor_include_local_rx, line):
-                        builder.add_module_import_from_include(line, m.matched)
+                        builder.add_local_include(line, m.matched)
                     elif (m.match(preprocessor_line_comment_rx, line)
                           or m.match(preprocessor_other_rx, line)
                           or m.match(spaces_rx, line)):
@@ -478,9 +554,15 @@ class Converter:
                         builder.add_module_content(line)
             i += 1
 
-        result_content = builder.build_result()
-        
-        return result_content
+        result: FileContentList = []
+        result.append(builder.build_file_content())
+
+        if file_options.convert_as_compat and builder.content_type == ContentType.MODULE_INTERFACE:
+            compat_header_builder = CompatHeaderBuilder(self.options, builder)
+            compat_header_builder.set_source_filename(filename)
+            result.append(compat_header_builder.build_file_content())
+
+        return result
     
     def make_builder_to_module(self, filename: str, content_type: ContentType) -> ModuleBaseBuilder:
         match content_type:
@@ -491,58 +573,61 @@ class Converter:
             case _:
                 raise RuntimeError(f'Unknown content type {content_type}')
         
-        builder.set_filename(PurePosixPath(filename))
+        builder.set_source_filename(PurePosixPath(filename))
         return builder
 
-    def convert_file_content_to_headers(self, content: str, filename: str, content_type: ContentType) -> str:
+    def convert_file_content_to_headers(self, content: str, filename: str, content_type: ContentType) -> FileContentList:
         if content_type in {ContentType.HEADER, ContentType.CXX}:
-            return content
-        return content
+            return [FileContent(filename, content_type, content)]
+        return [FileContent(filename, content_type, content)]
 
-    def convert_file_content(self, content: str, filename: str) -> str:
+    def convert_file_content(self, content: str, filename: str, file_options: FileOptions|None = None) -> FileContentList:
+        if file_options is None:
+            file_options = FileOptions()
         action = self.action
         content_type = get_source_content_type(action, filename)
         match action:
             case ConvertAction.MODULES:
-                return self.convert_file_content_to_module(content, filename, content_type)
+                return self.convert_file_content_to_module(content, filename, content_type, file_options)
             case ConvertAction.HEADERS:
-                return self.convert_file_content_to_headers(content, filename, content_type)
+                return self.convert_file_content_to_headers(content, filename, content_type, file_options)
             case _:
                 raise RuntimeError(f'Unknown action: "{action}"')
 
-    def convert_file(self, source_directory: Path, destination_directory: Path, filename: str) -> tuple[str, ContentType]:
+    def convert_file(self, source_directory: Path, destination_directory: Path, filename: str, file_options: FileOptions) -> FileContentList:
         with open(source_directory.joinpath(filename)) as source_file:
             source_content = source_file.read()
-        converted_content = self.convert_file_content(source_content, filename)
-        content_type = get_source_content_type(self.action, filename)
-        converted_content_type = get_converted_content_type(content_type)
-        converted_filename = convert_filename_to_content_type(filename, converted_content_type)
-        with open(destination_directory.joinpath(converted_filename), 'w') as destination_file:
-            destination_file.write(converted_content)
-        return (converted_filename, converted_content_type)
+        converted_files = self.convert_file_content(source_content, filename, file_options)
+        for converted_file in converted_files:
+            converted_content = converted_file.content
+            converted_filename = converted_file.filename
+            with open(destination_directory.joinpath(converted_filename), 'w') as destination_file:
+                destination_file.write(converted_content)
+        return converted_files
 
-    def convert_or_copy_file(self, source_directory: Path, destination_directory: Path, filename: str):
+    def convert_or_copy_file(self, source_directory: Path, destination_directory: Path, filename: str, file_options: FileOptions):
         content_type = get_source_content_type(self.action, filename)
         if content_type == ContentType.OTHER:
             shutil.copy2(source_directory.joinpath(filename), destination_directory.joinpath(filename))
         else:
             print('converting', filename)
-            (converted_filename, content_type) = self.convert_file(source_directory, destination_directory, filename)
-            print('converted ', converted_filename, '\t', content_type_to_name[content_type])
+            converted_files = self.convert_file(source_directory, destination_directory, filename, file_options)
+            for converted_file in converted_files:
+                print('converted ', converted_file.filename, '\t', converted_file.content_type)
 
     def convert_directory(self, source_directory: Path, destination_directory: Path):
         if self.options.root_dir and self.options.root_dir != Path() and source_directory != self.options.root_dir:
             self.add_filesystem_directory(self.options.root_dir)
-            self.convert_directory_impl(self.options.root_dir, destination_directory, source_directory.relative_to(self.options.root_dir))
+            self.convert_directory_impl(self.options.root_dir, destination_directory, source_directory.relative_to(self.options.root_dir), FileOptions())
         else:
             self.add_filesystem_directory(source_directory)
-            self.convert_directory_impl(source_directory, destination_directory)
+            self.convert_directory_impl(source_directory, destination_directory, Path(), FileOptions())
 
     def add_filesystem_directory(self, directory: Path):
         print('adding filesystem directory', directory)
         self.resolver.files_map.add_filesystem_directory(directory)
 
-    def convert_directory_impl(self, source_directory: Path, destination_directory: Path, subdir: str = None):
+    def convert_directory_impl(self, source_directory: Path, destination_directory: Path, subdir: str, file_options: FileOptions):
         source_directory_w_subdir = source_directory.joinpath(subdir or '')
         destination_directory_w_subdir = destination_directory.joinpath(subdir or '')
         destination_directory_w_subdir.mkdir(parents=True, exist_ok=True)
@@ -551,10 +636,19 @@ class Converter:
             if any_pattern_maches(self.options.skip_patterns, filename):
                 print(f'skipping "f{filename}"')
                 continue
+            next_file_options = self.make_next_file_options(file_options, filename)
             if filepath.is_file():
-                self.convert_or_copy_file(source_directory, destination_directory, filename)
+                self.convert_or_copy_file(source_directory, destination_directory, filename, next_file_options)
             if filepath.is_dir():
-                self.convert_directory_impl(source_directory, destination_directory, filename)
+                self.convert_directory_impl(source_directory, destination_directory, filename, next_file_options)
+
+    def make_next_file_options(self, file_options: FileOptions, filename: Path):
+        next_file_options = copy.copy(file_options)
+        if not file_options.convert_as_compat:
+            convert_as_compat = any_pattern_maches(self.options.compat_patterns, filename)
+            if convert_as_compat:
+                next_file_options.convert_as_compat = convert_as_compat
+        return next_file_options
 
 def any_pattern_maches(patterns: list[str], filename: Path) -> bool:
     for skip_pattern in patterns:
@@ -565,7 +659,8 @@ def any_pattern_maches(patterns: list[str], filename: Path) -> bool:
 
 def convert_file_content(action: ConvertAction, content: str, filename: str) -> str:
     converter = Converter(action)
-    return converter.convert_file_content(content, filename)
+    file_content_list: FileContentList = converter.convert_file_content(content, filename, FileOptions())
+    return file_content_list[0].content
 
 def convert_directory(action: ConvertAction, source_directory: Path, destination_directory: Path, subdir: str = None):
     converter = Converter(action)
