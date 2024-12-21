@@ -707,6 +707,27 @@ class TestClass
 } // namespace TestNS
 ''')
 
+def test_module_interface_compat_header_empty():
+    converter = Converter(ConvertAction.MODULES)
+    file_options = FileOptions()
+    file_options.convert_as_compat = True
+    converted = converter.convert_file_content(
+'''''', 'empty.h', file_options)
+    assert(converted == [
+        FileContent("empty.cppm", ContentType.MODULE_INTERFACE,
+'''#ifndef CXX_COMPAT_HEADER
+export module empty;
+#endif
+'''),
+        FileContent("empty.h", ContentType.HEADER,
+'''#pragma once
+#ifndef CXX_COMPAT_HEADER
+#define CXX_COMPAT_HEADER
+#endif
+#include "empty.cppm"
+'''),
+])
+
 def test_module_interface_compat_header():
     converter = Converter(ConvertAction.MODULES)
     file_options = FileOptions()
@@ -716,8 +737,51 @@ def test_module_interface_compat_header():
 ''', 'simple.h', file_options)
     assert(converted == [
         FileContent("simple.cppm", ContentType.MODULE_INTERFACE,
-'''export module simple;
+'''#ifndef CXX_COMPAT_HEADER
+module;
+#else
+#pragma once
+#include "local_include.h"
+#endif
+#ifndef CXX_COMPAT_HEADER
+export module simple;
+#endif
+#ifndef CXX_COMPAT_HEADER
 import local_include;
+#endif
+'''),
+        FileContent("simple.h", ContentType.HEADER,
+'''#pragma once
+#ifndef CXX_COMPAT_HEADER
+#define CXX_COMPAT_HEADER
+#endif
+#include "simple.cppm"
+'''),
+])
+
+def test_module_interface_compat_header_w_system_includes():
+    converter = Converter(ConvertAction.MODULES)
+    file_options = FileOptions()
+    file_options.convert_as_compat = True
+    converted = converter.convert_file_content(
+'''#include "local_include.h"
+#include <string>
+''', 'simple.h', file_options)
+    assert(converted == [
+        FileContent("simple.cppm", ContentType.MODULE_INTERFACE,
+'''#ifndef CXX_COMPAT_HEADER
+module;
+#else
+#pragma once
+#include "local_include.h"
+#endif
+#include <string>
+#ifndef CXX_COMPAT_HEADER
+export module simple;
+#endif
+#ifndef CXX_COMPAT_HEADER
+import local_include;
+#endif
 '''),
         FileContent("simple.h", ContentType.HEADER,
 '''#pragma once

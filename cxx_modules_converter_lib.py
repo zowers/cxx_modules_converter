@@ -267,15 +267,18 @@ class ModuleBaseBuilder(FileBaseBuilder):
     module_purview_start_prefix: str = ''   # 'module' or 'export module' - overriden in implementation classes
     content_type: ContentType = None
 
-    def __init__(self, options: Options, parent_resolver: FilesResolver):
+    def __init__(self, options: Options, parent_resolver: FilesResolver, file_options: FileOptions):
         super().__init__(options)
         self.parent_resolver: FilesResolver = parent_resolver
+        self.file_options: FileOptions = file_options
         self.resolver: ModuleFilesResolver = ModuleFilesResolver(self.parent_resolver, self.options)
         self.module_name: str = ''                   # name of the module
         self.file_copyright: StrList = []            # // File copyright
-        self.global_module_fragment_start: str = ''  # module;
+        self.global_module_fragment_start: StrList = []  # module;
+        self.global_module_fragment_compat_includes: StrList = []    # compat header includes
+        self.global_module_fragment_compat_end: StrList = []    # compat header includes endif
         self.global_module_fragment: StrList = []    # header includes
-        self.module_purview_start: str = ''          # export module <name>; // Start of module purview.
+        self.module_purview_start: StrList = []      # export module <name>; // Start of module purview.
         # self.module_imports: StrList = []
         # self.module_purview_special_headers: StrList = [] # // Configuration, export, etc.
         self.module_content: StrList = []
@@ -298,13 +301,29 @@ class ModuleBaseBuilder(FileBaseBuilder):
 
     def set_global_module_fragment_start(self):
         assert(not self.global_module_fragment_start)
-        self.global_module_fragment_start = 'module;'
+        if self.convert_as_compat_header():
+            self.global_module_fragment_start = [
+                f'''#ifndef {self.options.compat_macro}''',
+                f'''module;''',
+                f'''#else''',
+                f'''#pragma once''',
+            ]
+            self.global_module_fragment_compat_end = [
+                f'''#endif''',
+            ]
+        else:
+            self.global_module_fragment_start = [
+                'module;'
+            ]
 
-    def set_module_purview_start(self):
+    def set_module_purview_start(self, wait_for_import: bool = False):
         assert(not self.module_purview_start)
         assert(self.module_purview_start_prefix)
         assert(self.module_name)
-        self.module_purview_start = f'{self.module_purview_start_prefix} {self.module_name};'
+        module_purview_start = f'''{self.module_purview_start_prefix} {self.module_name};'''
+        self.module_purview_start = self.wrap_in_compat_macro_if_compat_header(
+            module_purview_start
+        )
 
     def add_file_copyright(self, line):
         self.file_copyright.append(line)
@@ -365,7 +384,24 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.flushed_module_preprocessor_nesting_count = self.preprocessor_nesting_count
         self.flushed_global_module_fragment_includes_count = 0
 
+    def convert_as_compat_header(self):
+        return self.file_options.convert_as_compat and self.content_type == ContentType.MODULE_INTERFACE
+
+    def wrap_in_compat_macro_if_compat_header(self, line):
+        if self.convert_as_compat_header():
+            return [
+                f'''#ifndef {self.options.compat_macro}''',
+                line,
+                f'''#endif''', # end compat_macro
+            ]
+        else:
+            return [
+                line
+            ]
+
     def add_local_include(self, line: str, match: re.Match = None):
+        if self.convert_as_compat_header():
+            self.add_compat_include(line)
         self.add_module_import_from_include(line, match)
 
     def add_module_import_from_include(self, line: str, match: re.Match = None):
@@ -392,19 +428,29 @@ class ModuleBaseBuilder(FileBaseBuilder):
         if line_module_name == self.module_name:
             return None
         import_line = f'{line_space1}{line_space2}import {line_module_name};{line_tail}'
-        self.add_module_content(import_line)
-    
+        import_lines = self.wrap_in_compat_macro_if_compat_header(import_line)
+        for import_line in import_lines:
+            self.add_module_content(import_line)
+
+    def add_compat_include(self, line: str):
+        if not self.global_module_fragment_start:
+            self.set_global_module_fragment_start()
+        self.global_module_fragment_compat_includes.append(line)
+
     def build_result(self):
-        assert(bool(self.global_module_fragment_start) == bool(self.global_module_fragment))
+        if self.global_module_fragment or self.global_module_fragment_compat_includes:
+            assert(bool(self.global_module_fragment_start))
         if self.flushed_module_preprocessor_nesting_count != 0:
             self._flush_module_staging()
         if not self.module_purview_start:
             self.set_module_purview_start()
         parts = [
             new_line.join(self.file_copyright),
-            self.global_module_fragment_start,
+            new_line.join(self.global_module_fragment_start),
+            new_line.join(self.global_module_fragment_compat_includes),
+            new_line.join(self.global_module_fragment_compat_end),
             new_line.join(self.global_module_fragment),
-            self.module_purview_start,
+            new_line.join(self.module_purview_start),
             # new_line.join(self.module_imports),
             # new_line.join(self.module_purview_special_headers),
             new_line.join(self.module_content),
@@ -503,7 +549,7 @@ class Converter:
             return [FileContent(filename, content_type, content)]
         content_lines = content.splitlines()
 
-        builder = self.make_builder_to_module(filename, content_type)
+        builder = self.make_builder_to_module(filename, content_type, file_options)
 
         is_comment = lambda: (not line
             or line2 == '//'
@@ -564,12 +610,14 @@ class Converter:
 
         return result
     
-    def make_builder_to_module(self, filename: str, content_type: ContentType) -> ModuleBaseBuilder:
+    def make_builder_to_module(self, filename: str, content_type: ContentType, file_options: FileOptions|None = None) -> ModuleBaseBuilder:
+        if not file_options:
+            file_options = FileOptions()
         match content_type:
             case ContentType.HEADER:
-                builder = ModuleInterfaceUnitBuilder(self.options, self.resolver)
+                builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
             case ContentType.CXX:
-                builder = ModuleImplUnitBuilder(self.options, self.resolver)
+                builder = ModuleImplUnitBuilder(self.options, self.resolver, file_options)
             case _:
                 raise RuntimeError(f'Unknown content type {content_type}')
         
@@ -634,7 +682,7 @@ class Converter:
         for filepath in source_directory_w_subdir.iterdir():
             filename = filepath.relative_to(source_directory)
             if any_pattern_maches(self.options.skip_patterns, filename):
-                print(f'skipping "f{filename}"')
+                print(f'skipping "{filename}"')
                 continue
             next_file_options = self.make_next_file_options(file_options, filename)
             if filepath.is_file():
