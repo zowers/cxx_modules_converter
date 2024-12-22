@@ -716,6 +716,7 @@ class TestClass
 };
 } // namespace Test
 } // namespace TestNS
+
 ''')
 
 def test_module_interface_compat_header_empty():

@@ -438,8 +438,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
     def build_result(self):
         if self.global_module_fragment or self.global_module_fragment_compat_includes:
             assert(bool(self.global_module_fragment_start))
-        if self.flushed_module_preprocessor_nesting_count != 0:
-            self._flush_module_staging()
+        self._flush_module_staging()
         if not self.module_purview_start:
             self.set_module_purview_start()
         parts = [
