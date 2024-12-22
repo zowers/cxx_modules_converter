@@ -366,6 +366,17 @@ def test_module_include_always_include_names_assert_h():
 #include "assert.h"
 ''')
 
+def test_module_include_always_include_names_options():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.always_include_names.append('options.h')
+    converted = converter.convert_file_content(
+'''#include "options.h"
+''', 'simple.h')
+    assert(converted[0].content == 
+'''export module simple;
+#include "options.h"
+''')
+
 def test_module_impl_include_local():
     converted = convert_file_content(
         ConvertAction.MODULES,

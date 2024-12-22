@@ -12,16 +12,16 @@ class ConvertAction(enum.StrEnum):
     HEADERS = 'headers'
 
 AlwaysIncludeNames: TypeAlias = set[str]
-always_include_names = {
+always_include_names = [
     'cassert',
     'assert.h',
-}
+]
 
 COMPAT_MACRO_DEFAULT: str = "CXX_COMPAT_HEADER"
 
 class Options:
     def __init__(self):
-        self.always_include_names = always_include_names
+        self.always_include_names = copy.copy(always_include_names)
         self.root_dir: Path = ''
         self.root_dir_module_name: str = ''
         self.search_path = []
@@ -420,7 +420,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         line_include_filename = match[3]
         line_tail = match[4]
 
-        if line_include_filename in self.options.always_include_names:
+        if any_pattern_maches(self.options.always_include_names, PurePosixPath(line_include_filename)):
             self.add_module_content(line)
             return
         

@@ -11,6 +11,7 @@ from cxx_modules_converter_lib import (
     Converter, 
     ConvertAction,
     COMPAT_MACRO_DEFAULT,
+    always_include_names
 )
 
 def parse_args(argv: list[str] = None):
@@ -34,6 +35,7 @@ def parse_args(argv: list[str] = None):
                         help='compat patterns - files and directories matching any pattern'
                         + ' will be converted in compatibility mode allowing to use as either module or header')
     parser.add_argument('-m', '--compat-macro', default=COMPAT_MACRO_DEFAULT, help='compatibility macro name used in compat modules and headers')
+    parser.add_argument('-e', '--header', action='append', default=always_include_names, help='always include headers with matching names')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
