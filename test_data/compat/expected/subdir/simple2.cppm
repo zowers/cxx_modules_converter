@@ -12,6 +12,10 @@ export module subdir.simple2;
 import local_include;
 #endif
 
+#ifndef CXX_COMPAT_HEADER
+extern "C++" {
+export {
+#endif
 namespace TestNS
 {
 namespace Test
@@ -22,3 +26,7 @@ class TestClass
 };
 } // namespace Test
 } // namespace TestNS
+#ifndef CXX_COMPAT_HEADER
+} // export
+} // extern "C++"
+#endif

@@ -282,6 +282,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         # self.module_imports: StrList = []
         # self.module_purview_special_headers: StrList = [] # // Configuration, export, etc.
         self.module_content: StrList = []
+        self.main_module_content_index: int|None = None
 
         self.module_staging: StrList = [] # staging area for next module entry
         self.flushed_module_preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements flushed to module content
@@ -343,13 +344,16 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.global_module_fragment_includes_count = 0
         self._flush_module_staging()
 
-    def add_system_include(self, line):
+    def handle_system_include(self, line: str):
         self.add_global_module_fragment(line)
 
     def add_global_module_fragment(self, line):
         self.global_module_fragment_includes_count += 1
         self._add_global_module_fragment_staging(line, 0)
         self._flush_global_module_fragment()
+
+    def handle_preprocessor(self, line: str, nesting_advance: int):
+        self.add_staging(line, nesting_advance)
 
     def add_staging(self, line: str, nesting_advance: int):
         self.preprocessor_nesting_count += nesting_advance
@@ -364,6 +368,43 @@ class ModuleBaseBuilder(FileBaseBuilder):
         if not self.module_purview_start:
             self.set_module_purview_start()
         self.module_purview_special_headers.append(line)
+
+    def handle_main_content(self, line: str):
+        self._flush_module_staging()
+        self._set_main_module_content_start()
+        self.add_module_content(line)
+
+    def _set_main_module_content_start(self):
+        if self.main_module_content_index is None:
+            self.main_module_content_index = len(self.module_content)
+
+    def _mark_module_interface_unit_export(self):
+        if self.main_module_content_index is None:
+            return
+        module_start = []
+        module_end = []
+        if self.content_type == ContentType.MODULE_INTERFACE:
+            # wrap module interface unit in export {}
+            module_start = [
+                '''export {'''
+            ]
+            module_end = [
+                '''} // export'''
+            ]
+        if self.file_options.convert_as_compat:
+            # wrap module content in extern "C++" {}
+            module_start = [
+                '''extern "C++" {'''
+                ] + module_start
+            module_end = module_end + [
+                '''} // extern "C++"'''
+                ]
+            # wrap in #ifdef CXX_COMPAT_HEADER/#endif
+            module_start = self.wrap_in_compat_macro_if_compat_header(module_start)
+            module_end = self.wrap_in_compat_macro_if_compat_header(module_end)
+        for line in reversed(module_start):
+            self.module_content.insert(self.main_module_content_index, line)
+        self.module_content = self.module_content + module_end
 
     def add_module_content(self, line):
         self._flush_module_staging()
@@ -397,7 +438,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         else:
             return lines
 
-    def add_local_include(self, line: str, match: re.Match = None):
+    def handle_local_include(self, line: str, match: re.Match = None):
         if self.convert_as_compat_header():
             self.add_compat_include(line)
         self.add_module_import_from_include(line, match)
@@ -441,6 +482,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self._flush_module_staging()
         if not self.module_purview_start:
             self.set_module_purview_start()
+        self._mark_module_interface_unit_export()
         parts = [
             new_line.join(self.file_copyright),
             new_line.join(self.global_module_fragment_start),
@@ -580,21 +622,21 @@ class Converter:
                 case HeaderScanState.MAIN:
                     m = Matcher()
                     if m.match(preprocessor_include_system_rx, line):
-                        builder.add_system_include(line)
+                        builder.handle_system_include(line)
                     elif m.match(preprocessor_include_local_rx, line):
-                        builder.add_local_include(line, m.matched)
+                        builder.handle_local_include(line, m.matched)
                     elif (m.match(preprocessor_line_comment_rx, line)
                           or m.match(preprocessor_other_rx, line)
                           or m.match(spaces_rx, line)):
-                        builder.add_staging(line, 0)
+                        builder.handle_preprocessor(line, 0)
                     elif (m.match(preprocessor_define_rx, line)):
-                        builder.add_staging(line, 0)
+                        builder.handle_preprocessor(line, 0)
                     elif m.match(preprocessor_if_rx, line):
-                        builder.add_staging(line, 1)
+                        builder.handle_preprocessor(line, 1)
                     elif m.match(preprocessor_endif_rx, line):
-                        builder.add_staging(line, -1)
+                        builder.handle_preprocessor(line, -1)
                     else:
-                        builder.add_module_content(line)
+                        builder.handle_main_content(line)
             i += 1
 
         result: FileContentList = []

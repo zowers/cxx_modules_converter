@@ -120,7 +120,9 @@ namespace TestNS {}
 #endif // FLAG
 export module simple;
 import local_include;
+export {
 namespace TestNS {}
+} // export
 ''')
 
 def test_module_include_local_ifdef():
@@ -154,7 +156,9 @@ import local_include;
 #ifdef FLAG
   import local_include_2;
 #endif // FLAG
+export {
 namespace TestNS {}
+} // export
 ''')
 
 def test_module_include_system_ifdef_and_content_w_newlines():
@@ -181,7 +185,9 @@ namespace TestNS {}
 export module simple;
 import local_include;
 
+export {
 namespace TestNS {}
+} // export
 ''')
 
 def test_module_include_system_ifdef_twice():
@@ -707,6 +713,7 @@ module;
 export module simple;
 import local_include;
 
+export {
 namespace TestNS
 {
 namespace Test
@@ -717,6 +724,7 @@ class TestClass
 } // namespace Test
 } // namespace TestNS
 
+} // export
 ''')
 
 def test_module_interface_compat_header_empty():
