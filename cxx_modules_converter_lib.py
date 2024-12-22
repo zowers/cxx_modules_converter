@@ -321,9 +321,9 @@ class ModuleBaseBuilder(FileBaseBuilder):
         assert(self.module_purview_start_prefix)
         assert(self.module_name)
         module_purview_start = f'''{self.module_purview_start_prefix} {self.module_name};'''
-        self.module_purview_start = self.wrap_in_compat_macro_if_compat_header(
+        self.module_purview_start = self.wrap_in_compat_macro_if_compat_header([
             module_purview_start
-        )
+        ])
 
     def add_file_copyright(self, line):
         self.file_copyright.append(line)
@@ -387,17 +387,15 @@ class ModuleBaseBuilder(FileBaseBuilder):
     def convert_as_compat_header(self):
         return self.file_options.convert_as_compat and self.content_type == ContentType.MODULE_INTERFACE
 
-    def wrap_in_compat_macro_if_compat_header(self, line):
+    def wrap_in_compat_macro_if_compat_header(self, lines: StrList):
         if self.convert_as_compat_header():
             return [
                 f'''#ifndef {self.options.compat_macro}''',
-                line,
+            ] + lines + [
                 f'''#endif''', # end compat_macro
             ]
         else:
-            return [
-                line
-            ]
+            return lines
 
     def add_local_include(self, line: str, match: re.Match = None):
         if self.convert_as_compat_header():
@@ -428,7 +426,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         if line_module_name == self.module_name:
             return None
         import_line = f'{line_space1}{line_space2}import {line_module_name};{line_tail}'
-        import_lines = self.wrap_in_compat_macro_if_compat_header(import_line)
+        import_lines = self.wrap_in_compat_macro_if_compat_header([import_line])
         for import_line in import_lines:
             self.add_module_content(import_line)
 
