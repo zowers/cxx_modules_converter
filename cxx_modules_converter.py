@@ -71,6 +71,9 @@ def main(parsed_args):
         converter.options.compat_patterns.append(compat_pattern)
     if parsed_args.compat_macro:
         converter.options.compat_macro = parsed_args.compat_macro;
+    for header in parsed_args.header:
+        log_messages.append(f'header: "{header}"')
+        converter.options.always_include_names.append(header)
     log_text = '\n'.join(log_messages)
     log(log_text)
     converter.convert_directory(directory, Path(destination))
