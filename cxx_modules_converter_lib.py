@@ -24,7 +24,7 @@ class Options:
         self.always_include_names = copy.copy(always_include_names)
         self.root_dir: Path = Path()
         self.root_dir_module_name: str = ''
-        self.search_path = []
+        self.search_path: list[str] = []
         self.skip_patterns: list[str] = []
         self.compat_patterns: list[str] = []
         self.compat_macro: str = COMPAT_MACRO_DEFAULT
@@ -49,13 +49,14 @@ class FilesMap:
         self.value: FilesMapDict = {}
 
     def find(self, path: PurePosixPath) -> FilesMapDict | FileEntryType | None:
-        value = self.value
+        value: FilesMapDict = self.value
         for part in path.parts:
             if not value:
                 break
-            if type(value) is not dict:
-                return None
-            value = value.get(part, None)
+            nextValue = value.get(part, None)
+            if type(nextValue) is not dict:
+                return nextValue
+            value = nextValue
         return value
 
     def add_filesystem_directory(self, path: Path):
@@ -200,7 +201,7 @@ class FileContent:
     def __repr__(self):
         return str(self.__dict__)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object):
         return self.__dict__ == other.__dict__
 
 FileContentList: TypeAlias = list[FileContent]
@@ -291,7 +292,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.resolver.set_filename(source_filename)
         self.set_module_name(self.parent_resolver.convert_filename_to_module_name(PurePosixPath(source_filename)))
 
-    def set_module_name(self, name):
+    def set_module_name(self, name: str):
         assert(not self.module_name)
         self.module_name = name
 
@@ -321,7 +322,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
             module_purview_start
         ])
 
-    def add_file_copyright(self, line):
+    def add_file_copyright(self, line: str):
         self.file_copyright.append(line)
 
     def _flush_global_module_fragment(self):
@@ -342,7 +343,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
     def handle_system_include(self, line: str):
         self.add_global_module_fragment(line)
 
-    def add_global_module_fragment(self, line):
+    def add_global_module_fragment(self, line: str):
         self.global_module_fragment_includes_count += 1
         self._add_global_module_fragment_staging(line, 0)
         self._flush_global_module_fragment()
@@ -359,7 +360,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.global_module_fragment_staging.append(line)
         self._flush_global_module_fragment()
 
-    def add_module_purview_special_headers(self, line):
+    def add_module_purview_special_headers(self, line: str):
         if not self.module_purview_start:
             self.set_module_purview_start()
         # self.module_purview_special_headers.append(line)
@@ -401,7 +402,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
             self.module_content.insert(self.main_module_content_index, line)
         self.module_content = self.module_content + module_end
 
-    def add_module_content(self, line):
+    def add_module_content(self, line: str):
         self._flush_module_staging()
         if not self.module_purview_start:
             self.set_module_purview_start()
@@ -433,12 +434,12 @@ class ModuleBaseBuilder(FileBaseBuilder):
         else:
             return lines
 
-    def handle_local_include(self, line: str, match: re.Match | None = None):
+    def handle_local_include(self, line: str, match: re.Match[str] | None = None):
         if self.convert_as_compat_header():
             self.add_compat_include(line)
         self.add_module_import_from_include(line, match)
 
-    def add_module_import_from_include(self, line: str, match: re.Match | None = None):
+    def add_module_import_from_include(self, line: str, match: re.Match[str] | None = None):
         if not self.module_purview_start:
             self.set_module_purview_start()
         
@@ -564,9 +565,9 @@ class HeaderScanState(enum.IntEnum):
 
 class Matcher:
     def __init__(self):
-        self.rx: re.Pattern | None = None
-        self.matched: re.Match | None = None
-    def match(self, rx: re.Pattern, s) -> re.Match | None:
+        self.rx: re.Pattern[str] | None = None
+        self.matched: re.Match[str] | None = None
+    def match(self, rx: re.Pattern[str], s: str) -> re.Match[str] | None:
         self.rx = rx
         self.matched = self.rx.match(s)
         return self.matched
@@ -675,7 +676,7 @@ class Converter:
                 return self.convert_file_content_to_module(content, filename, content_type, file_options)
             case ConvertAction.HEADERS:
                 return self.convert_file_content_to_headers(content, filename, content_type, file_options)
-            case _:
+            case _: # type: ignore
                 raise RuntimeError(f'Unknown action: "{action}"')
 
     def convert_file(self, source_directory: Path, destination_directory: Path, filename: Path, file_options: FileOptions) -> FileContentList:

@@ -13,7 +13,6 @@ from cxx_modules_converter_lib import (
     FileOptions,
     FilesResolver,
     ModuleFilesResolver,
-    ContentType,
     FileContent,
     )
 
@@ -425,7 +424,6 @@ def test_resolve_include_to_module_name():
 
 def test_resolver_convert_filename_to_module_name():
     converter = Converter(ConvertAction.MODULES)
-    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
     assert(converter.resolver.convert_filename_to_module_name(PurePosixPath('simple.cpp')) == 'simple')
     assert(converter.resolver.convert_filename_to_module_name(PurePosixPath('subdir/simple.cpp')) == 'subdir.simple')
 
@@ -828,13 +826,13 @@ import local_include;
 
 
 @pytest.fixture(scope="function")
-def dir_simple(tmp_path_factory):
+def dir_simple(tmp_path_factory: pytest.TempPathFactory):
     path = tmp_path_factory.mktemp("simple")
     return path
 
 def assert_files(expected_dir: Path, result_dir: Path, expected_files: list[str]):
-    result_files = set()
-    for (root, dirs, files) in result_dir.walk():
+    result_files: set[str] = set()
+    for (root, _, files) in result_dir.walk():
         relative_root = root.relative_to(result_dir)
         for name in files:
             result_files.add(relative_root.joinpath(name).as_posix())
@@ -861,7 +859,6 @@ def test_dir_simple(dir_simple: Path):
 def test_dir_named1(dir_simple: Path):
     data_directory = Path('test_data/named1')
     converter = Converter(ConvertAction.MODULES)
-    input_dir = data_directory.joinpath('input')
     converter.options.root_dir_module_name = 'org'
     converter.convert_directory(data_directory.joinpath('input'), dir_simple)
     # convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
