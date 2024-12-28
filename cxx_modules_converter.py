@@ -14,7 +14,7 @@ from cxx_modules_converter_lib import (
     always_include_names
 )
 
-def parse_args(argv: list[str] = None):
+def parse_args(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(
                     prog='cxx_modules_converter',
                     description='Convert C++20 modules to headers and headers to modules',

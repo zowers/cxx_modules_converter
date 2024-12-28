@@ -426,8 +426,8 @@ def test_resolve_include_to_module_name():
 def test_resolver_convert_filename_to_module_name():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
-    assert(converter.resolver.convert_filename_to_module_name('simple.cpp') == 'simple')
-    assert(converter.resolver.convert_filename_to_module_name('subdir/simple.cpp') == 'subdir.simple')
+    assert(converter.resolver.convert_filename_to_module_name(PurePosixPath('simple.cpp')) == 'simple')
+    assert(converter.resolver.convert_filename_to_module_name(PurePosixPath('subdir/simple.cpp')) == 'subdir.simple')
 
 def test_FilesMap_add_filesystem_directory():
     files_map = FilesMap()
@@ -480,8 +480,8 @@ def test_FilesMap_add_map():
 def test_FilesResolver_resolve_in_search_path_empty_map():
     options = Options()
     files_resolver = FilesResolver(options)
-    assert(files_resolver.resolve_in_search_path(PurePosixPath(''), 'test', 'root.h') == PurePosixPath('root.h'))
-    assert(files_resolver.resolve_in_search_path(PurePosixPath('subdir1'), 'test', 'simple1.h') == PurePosixPath('simple1.h'))
+    assert(files_resolver.resolve_in_search_path(Path(''), 'test', 'root.h') == PurePosixPath('root.h'))
+    assert(files_resolver.resolve_in_search_path(Path('subdir1'), 'test', 'simple1.h') == PurePosixPath('simple1.h'))
 
 def test_ModuleFilesResolver_resolve_in_search_path():
     options = Options()
@@ -504,7 +504,7 @@ def test_ModuleFilesResolver_resolve_in_search_path():
             },
         },
     })
-    modules_resolver.set_filename(PurePosixPath('subdir1/test'))
+    modules_resolver.set_filename(Path('subdir1/test'))
     # check existing file from root
     assert(modules_resolver.resolve_include('subdir1/subdir2/simple2.h') == PurePosixPath('subdir1/subdir2/simple2.h'))
     # check existing file in relative subdir
