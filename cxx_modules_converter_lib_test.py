@@ -388,8 +388,16 @@ def test_module_impl_include_local():
 '''#include "local_include.h"
 ''', 'simple.cpp')
     assert(converted == 
-'''module simple;
-import local_include;
+'''import local_include;
+''')
+
+def test_module_impl_include_system():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include <vector>
+''', 'simple.cpp')
+    assert(converted == 
+'''#include <vector>
 ''')
 
 def test_module_impl_include_self_header():
@@ -399,6 +407,48 @@ def test_module_impl_include_self_header():
 ''', 'simple.cpp')
     assert(converted == 
 '''module simple;
+''')
+
+def test_module_impl_include_self_header_and_system():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "simple.h"
+#include <vector>
+''', 'simple.cpp')
+    assert(converted ==
+'''module;
+#include <vector>
+module simple;
+''')
+
+def test_module_impl_include_self_header_and_system_and_local():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "simple.h"
+#include "local_include.h"
+#include <vector>
+''', 'simple.cpp')
+    assert(converted ==
+'''module;
+#include <vector>
+module simple;
+import local_include;
+''')
+
+def test_module_impl_include_self_header_and_system_and_local_and_assert_h():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "simple.h"
+#include "local_include.h"
+#include "assert.h"
+#include <vector>
+''', 'simple.cpp')
+    assert(converted ==
+'''module;
+#include <vector>
+module simple;
+import local_include;
+#include "assert.h"
 ''')
 
 def test_resolve_include():
@@ -819,8 +869,7 @@ def test_module_impl_compat():
 ''', 'simple.cpp', file_options)
     assert(converted == [
         FileContent("simple.cpp", ContentType.MODULE_IMPL,
-'''module simple;
-import local_include;
+'''import local_include;
 '''),
 ])
 

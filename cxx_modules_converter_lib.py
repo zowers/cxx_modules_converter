@@ -296,8 +296,17 @@ class ModuleBaseBuilder(FileBaseBuilder):
         assert(not self.module_name)
         self.module_name = name
 
+    def set_is_actually_module(self) -> None:
+        raise NotImplementedError('set_is_actually_module')
+
+    def get_is_actually_module(self) -> bool:
+        raise NotImplementedError('get_is_actually_module')
+
     def set_global_module_fragment_start(self):
-        assert(not self.global_module_fragment_start)
+        if self.global_module_fragment_start:
+            return
+        if not self.get_is_actually_module():
+            return
         if self.convert_as_compat_header():
             self.global_module_fragment_start = [
                 f'''#ifndef {self.options.compat_macro}''',
@@ -313,8 +322,11 @@ class ModuleBaseBuilder(FileBaseBuilder):
                 'module;'
             ]
 
-    def set_module_purview_start(self, wait_for_import: bool = False):
-        assert(not self.module_purview_start)
+    def set_module_purview_start(self):
+        if self.module_purview_start:
+            return
+        if not self.get_is_actually_module():
+            return
         assert(self.module_purview_start_prefix)
         assert(self.module_name)
         module_purview_start = f'''{self.module_purview_start_prefix} {self.module_name};'''
@@ -331,8 +343,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
             return
         if self.global_module_fragment_includes_count == 0:
             return
-        if not self.global_module_fragment_start:
-            self.set_global_module_fragment_start()
+        self.set_global_module_fragment_start()
         for line in self.global_module_fragment_staging:
             self.global_module_fragment.append(line)
         self.global_module_fragment_staging = []
@@ -361,8 +372,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self._flush_global_module_fragment()
 
     def add_module_purview_special_headers(self, line: str):
-        if not self.module_purview_start:
-            self.set_module_purview_start()
+        self.set_module_purview_start()
         # self.module_purview_special_headers.append(line)
 
     def handle_main_content(self, line: str):
@@ -404,16 +414,14 @@ class ModuleBaseBuilder(FileBaseBuilder):
 
     def add_module_content(self, line: str):
         self._flush_module_staging()
-        if not self.module_purview_start:
-            self.set_module_purview_start()
+        self.set_module_purview_start()
         self.module_content.append(line)
 
     def _add_module_staging(self, line: str, nesting_advance: int):
         self.module_staging.append(line)
 
     def _flush_module_staging(self):
-        if not self.module_purview_start:
-            self.set_module_purview_start()
+        self.set_module_purview_start()
         if self.flushed_global_module_fragment_includes_count == 0 or self.flushed_module_preprocessor_nesting_count != 0:
             for line in self.module_staging:
                 self.module_content.append(line)
@@ -440,9 +448,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.add_module_import_from_include(line, match)
 
     def add_module_import_from_include(self, line: str, match: re.Match[str] | None = None):
-        if not self.module_purview_start:
-            self.set_module_purview_start()
-        
+        self.set_module_purview_start()
         if not match:
             match = preprocessor_include_local_rx.match(line)
         if not match:
@@ -461,23 +467,22 @@ class ModuleBaseBuilder(FileBaseBuilder):
         
         line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename)
         if line_module_name == self.module_name:
-            return None
+            self.set_is_actually_module()
+            self.set_module_purview_start()
+            return
         import_line = f'{line_space1}{line_space2}import {line_module_name};{line_tail}'
         import_lines = self.wrap_in_compat_macro_if_compat_header([import_line])
         for import_line in import_lines:
             self.add_module_content(import_line)
 
     def add_compat_include(self, line: str):
-        if not self.global_module_fragment_start:
-            self.set_global_module_fragment_start()
+        self.set_global_module_fragment_start()
         self.global_module_fragment_compat_includes.append(line)
 
     def build_result(self):
         if self.global_module_fragment or self.global_module_fragment_compat_includes:
-            assert(bool(self.global_module_fragment_start))
+            assert(bool(self.global_module_fragment_start) == self.get_is_actually_module())
         self._flush_module_staging()
-        if not self.module_purview_start:
-            self.set_module_purview_start()
         self._mark_module_interface_unit_export()
         parts = [
             new_line.join(self.file_copyright),
@@ -516,6 +521,13 @@ export module <name>;      // Start of module purview.
     '''
     module_purview_start_prefix: str = 'export module'
 
+    def set_is_actually_module(self) -> None:
+        pass
+
+    def get_is_actually_module(self) -> bool:
+        '''module interface unit is always actually module'''
+        return True
+
 class ModuleImplUnitBuilder(ModuleBaseBuilder):
     content_type = ContentType.MODULE_IMPL
     '''
@@ -534,6 +546,17 @@ module <name>;             // Start of module purview.
 <module implementation>
     '''
     module_purview_start_prefix: str = 'module'
+
+    def __init__(self, options: Options, parent_resolver: FilesResolver, file_options: FileOptions):
+        super().__init__(options, parent_resolver, file_options)
+        self._is_actually_module = False
+
+    def set_is_actually_module(self) -> None:
+        self._is_actually_module = True
+
+    def get_is_actually_module(self) -> bool:
+        return self._is_actually_module
+
 
 class CompatHeaderBuilder(FileBaseBuilder):
     content_type = ContentType.HEADER
