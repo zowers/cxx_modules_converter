@@ -281,6 +281,25 @@ export module simple;
 import local_include;
 ''')
 
+def test_module_include_local_and_system_multiline_define():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#define FLAG \\
+    1 \\
+    2
+#include <vector>
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#define FLAG \\
+    1 \\
+    2
+#include <vector>
+export module simple;
+import local_include;
+''')
+
 def test_module_include_system_and_local_in_one_ifdef():
     converted = convert_file_content(
         ConvertAction.MODULES,
@@ -329,6 +348,39 @@ import local_include;
 // comment flag2
 #ifdef FLAG2
  // comment local include
+  import local_include_2;
+#endif // FLAG2
+''')
+
+def test_module_include_system_and_local_multiline_ifdef_elif():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#ifdef FLAG1 \\
+    && FLAG11
+ # include <vector>
+#elif FLAG1 \\
+    && FLAG11
+ // nothing
+#endif // FLAG1
+#ifdef FLAG2 \\
+    && FLAG22
+ # include "local_include_2.h"
+#endif // FLAG2
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#ifdef FLAG1 \\
+    && FLAG11
+ # include <vector>
+#elif FLAG1 \\
+    && FLAG11
+ // nothing
+#endif // FLAG1
+export module simple;
+import local_include;
+#ifdef FLAG2 \\
+    && FLAG22
   import local_include_2;
 #endif // FLAG2
 ''')

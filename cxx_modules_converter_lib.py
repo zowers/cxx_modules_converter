@@ -235,17 +235,17 @@ preprocessor_block_comment_rx = re.compile(r'''^\s*/\*.*$''')
 # regex: block comment end
 preprocessor_block_comment_rx = re.compile(r'''^\s*\*/.*$''')
 # regex: #if
-preprocessor_if_rx = re.compile(r'''^\s*#\s*if.*$''')
+preprocessor_if_rx = re.compile(r'''^\s*#\s*if.*''')
 # regex: #endif
 preprocessor_endif_rx = re.compile(r'''^\s*#\s*endif.*$''')
 # regex: #define
-preprocessor_define_rx = re.compile(r'''^\s*#\s*define.*$''')
+preprocessor_define_rx = re.compile(r'''^\s*#\s*define.*''')
 # regex: #error
 # regex: #elif
 # regex: #else
 # regex: #pragma
 # regex: #warning
-preprocessor_other_rx = re.compile(r'''^\s*#\s*(error|elif|else|pragma|warning).*$''')
+preprocessor_other_rx = re.compile(r'''^\s*#\s*(error|elif|else|pragma|warning).*''')
 
 class FileBaseBuilder:
     content_type: ContentType = ContentType.OTHER
@@ -627,6 +627,10 @@ class Converter:
         i = 0
         while i < len(content_lines):
             line = content_lines[i]
+            while line and line[-1] == '\\' and i+1 < len(content_lines):
+                # handle backslash \ as last character on line -- line continues on next line
+                i += 1
+                line += new_line + content_lines[i]
             line2 = line[0:2]
             line3 = line[0:3]
             if scanState == HeaderScanState.START:
