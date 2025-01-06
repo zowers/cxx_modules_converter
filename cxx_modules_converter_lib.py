@@ -720,7 +720,7 @@ class Converter:
 
     def convert_or_copy_file(self, source_directory: Path, destination_directory: Path, filename: Path, file_options: FileOptions):
         content_type = get_source_content_type(self.action, filename)
-        if content_type == ContentType.OTHER:
+        if content_type == ContentType.OTHER or any_pattern_maches(self.options.always_include_names, PurePosixPath(filename)):
             shutil.copy2(source_directory.joinpath(filename), destination_directory.joinpath(filename))
         else:
             print('converting', filename)

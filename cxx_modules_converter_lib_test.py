@@ -1023,3 +1023,14 @@ def test_dir_subdirs_rooted(dir_simple: Path):
         'subdir/subdir1/subdir2/simple1.cpp',
         'subdir/subdir1/subdir2/simple2.cppm',
     ])
+
+def test_dir_header(dir_simple: Path):
+    data_directory = Path('test_data/header')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.always_include_names.append('simple.h')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.h',
+        'simple.cpp',
+    ])
+
