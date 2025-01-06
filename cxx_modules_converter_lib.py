@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import enum
 import os
@@ -5,9 +7,14 @@ import os.path
 from pathlib import Path, PurePosixPath
 import re
 import shutil
-from typing import TypeAlias
 
-class ConvertAction(enum.StrEnum):
+from typing import Any
+try:
+    from typing import TypeAlias
+except ImportError:
+    TypeAlias = Any
+
+class ConvertAction(enum.Enum):
     MODULES = 'modules'
     HEADERS = 'headers'
 
@@ -38,7 +45,7 @@ def filename_to_module_name(filename: PurePosixPath) -> str:
     result = parts[0].replace('/', '.').replace('\\', '.')
     return result
 
-class FileEntryType(enum.IntEnum):
+class FileEntryType(enum.Enum):
     FILE = 1
     DIR = 2
 
@@ -60,8 +67,8 @@ class FilesMap:
         return value
 
     def add_filesystem_directory(self, path: Path):
-        for (root, dirs, files) in path.walk():
-            relative_root = root.relative_to(path)
+        for (root, dirs, files) in os.walk(path):
+            relative_root = Path(os.path.relpath(root, path))
             if relative_root == Path(''):
                 root_node: FilesMapDict = self.value
             else:
@@ -126,7 +133,7 @@ class ModuleFilesResolver:
         result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
         return result
 
-class ContentType(enum.IntEnum):
+class ContentType(enum.Enum):
     HEADER = 1
     CXX = 2
     MODULE_INTERFACE = 3
@@ -209,7 +216,7 @@ FileContentList: TypeAlias = list[FileContent]
 StrList: TypeAlias = list[str]
 new_line = '\n'
 
-class LineCompatibility(enum.IntEnum):
+class LineCompatibility(enum.Enum):
     GLOBAL_MODULE_FRAGMENT = 1
     MODULE_CONTENT = 2
     ANY = 3
@@ -581,7 +588,7 @@ class CompatHeaderBuilder(FileBaseBuilder):
         ]
         return new_line.join(parts) + new_line
 
-class HeaderScanState(enum.IntEnum):
+class HeaderScanState(enum.Enum):
     START = enum.auto()
     FILE_COMMENT = enum.auto()
     MAIN = enum.auto()
@@ -621,15 +628,14 @@ class Converter:
             line = content_lines[i]
             line2 = line[0:2]
             line3 = line[0:3]
-            match scanState:
-                case HeaderScanState.START:
+            if scanState == HeaderScanState.START:
                     if is_comment():
                         scanState = HeaderScanState.FILE_COMMENT
                         continue
                     else:
                         scanState = HeaderScanState.MAIN
                         continue
-                case HeaderScanState.FILE_COMMENT:
+            elif scanState == HeaderScanState.FILE_COMMENT:
                     line2 = line.strip()[0:2] 
                     if (is_comment()
                         or line2[0] == '*'
@@ -638,7 +644,7 @@ class Converter:
                     else:
                         scanState = HeaderScanState.MAIN
                         continue
-                case HeaderScanState.MAIN:
+            elif scanState == HeaderScanState.MAIN:
                     m = Matcher()
                     if m.match(preprocessor_include_system_rx, line):
                         builder.handle_system_include(line)
@@ -672,12 +678,11 @@ class Converter:
         filename = Path(filename)
         if not file_options:
             file_options = FileOptions()
-        match content_type:
-            case ContentType.HEADER:
-                builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
-            case ContentType.CXX:
-                builder = ModuleImplUnitBuilder(self.options, self.resolver, file_options)
-            case _:
+        if content_type == ContentType.HEADER:
+            builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
+        elif content_type == ContentType.CXX:
+            builder = ModuleImplUnitBuilder(self.options, self.resolver, file_options)
+        else:
                 raise RuntimeError(f'Unknown content type {content_type}')
         
         builder.set_source_filename(filename)
@@ -694,13 +699,12 @@ class Converter:
             file_options = FileOptions()
         action = self.action
         content_type = get_source_content_type(action, filename)
-        match action:
-            case ConvertAction.MODULES:
-                return self.convert_file_content_to_module(content, filename, content_type, file_options)
-            case ConvertAction.HEADERS:
-                return self.convert_file_content_to_headers(content, filename, content_type, file_options)
-            case _: # type: ignore
-                raise RuntimeError(f'Unknown action: "{action}"')
+        if action == ConvertAction.MODULES:
+            return self.convert_file_content_to_module(content, filename, content_type, file_options)
+        elif action == ConvertAction.HEADERS:
+            return self.convert_file_content_to_headers(content, filename, content_type, file_options)
+        else:
+            raise RuntimeError(f'Unknown action: "{action}"')
 
     def convert_file(self, source_directory: Path, destination_directory: Path, filename: Path, file_options: FileOptions) -> FileContentList:
         with open(source_directory.joinpath(filename)) as source_file:

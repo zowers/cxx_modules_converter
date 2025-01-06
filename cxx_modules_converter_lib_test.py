@@ -1,7 +1,8 @@
+import os
 import os.path
 from pathlib import Path, PurePosixPath
 import pytest
-from cxx_modules_converter_lib import (
+from .cxx_modules_converter_lib import (
     Converter,
     convert_file_content,
     convert_directory,
@@ -881,8 +882,8 @@ def dir_simple(tmp_path_factory: pytest.TempPathFactory):
 
 def assert_files(expected_dir: Path, result_dir: Path, expected_files: list[str]):
     result_files: set[str] = set()
-    for (root, _, files) in result_dir.walk():
-        relative_root = root.relative_to(result_dir)
+    for (root, _, files) in os.walk(result_dir):
+        relative_root = Path(os.path.relpath(root, result_dir))
         for name in files:
             result_files.add(relative_root.joinpath(name).as_posix())
     assert(result_files == set(expected_files))

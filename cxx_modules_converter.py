@@ -2,6 +2,7 @@
 #
 # Convert C++20 modules to headers and headers to modules
 #
+from __future__ import annotations
 
 import argparse
 from pathlib import Path
@@ -45,7 +46,7 @@ def log(message: str):
 
 def main(parsed_args: Any):
     log_messages: list[str] = []
-    log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {'inplace' if parsed_args.inplace else ' into ' + parsed_args.destination}')
+    log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {"inplace" if parsed_args.inplace else " into " + parsed_args.destination}')
     if parsed_args.inplace:
         destination = parsed_args.directory
     else:
@@ -71,7 +72,7 @@ def main(parsed_args: Any):
         log_messages.append(f'compat pattern: "{compat_pattern}"')
         converter.options.compat_patterns.append(compat_pattern)
     if parsed_args.compat_macro:
-        converter.options.compat_macro = parsed_args.compat_macro;
+        converter.options.compat_macro = parsed_args.compat_macro
     for header in parsed_args.header:
         log_messages.append(f'header: "{header}"')
         converter.options.always_include_names.append(header)
