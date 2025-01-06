@@ -10,10 +10,11 @@ import shutil
 
 from typing import Any
 try:
-    from typing import TypeAlias
+    # make pylance happy
+    from typing import TypeAlias as TypeAlias2
 except ImportError:
-    TypeAlias = Any
-
+    TypeAlias2 = Any
+TypeAlias = TypeAlias2
 class ConvertAction(enum.Enum):
     MODULES = 'modules'
     HEADERS = 'headers'
