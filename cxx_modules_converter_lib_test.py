@@ -420,8 +420,9 @@ def test_module_include_always_include_names_assert_h():
 '''#include "assert.h"
 ''', 'simple.h')
     assert(converted == 
-'''export module simple;
+'''module;
 #include "assert.h"
+export module simple;
 ''')
 
 def test_module_include_always_include_names_options():
@@ -431,8 +432,46 @@ def test_module_include_always_include_names_options():
 '''#include "options.h"
 ''', 'simple.h')
     assert(converted[0].content == 
-'''export module simple;
+'''module;
 #include "options.h"
+export module simple;
+''')
+
+def test_module_include_always_include_names_subdir():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.always_include_names.append('subdir/options.h')
+    converter.resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'options.h': FileEntryType.FILE,
+            'simple.h': FileEntryType.FILE,
+        },
+    })
+    converted = converter.convert_file_content(
+'''#include "options.h"
+''', 'subdir/simple.h')
+    assert(converted[0].content == 
+'''module;
+#include "options.h"
+export module subdir.simple;
+''')
+
+def test_module_include_always_include_names_subdir_root_named():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.always_include_names.append('subdir/options.h')
+    converter.resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'options.h': FileEntryType.FILE,
+            'simple.h': FileEntryType.FILE,
+        },
+    })
+    converter.options.root_dir_module_name = 'org'
+    converted = converter.convert_file_content(
+'''#include "options.h"
+''', 'subdir/simple.h')
+    assert(converted[0].content == 
+'''module;
+#include "options.h"
+export module org.subdir.simple;
 ''')
 
 def test_module_impl_include_local():
@@ -498,11 +537,40 @@ def test_module_impl_include_self_header_and_system_and_local_and_assert_h():
 ''', 'simple.cpp')
     assert(converted ==
 '''module;
+#include "assert.h"
 #include <vector>
 module simple;
 import local_include;
-#include "assert.h"
 ''')
+
+def test_module_impl_include_self_header_compat():
+    converter = Converter(ConvertAction.MODULES)
+    file_options = FileOptions()
+    file_options.convert_as_compat = True
+    converted = converter.convert_file_content(
+'''#include "simple.h"
+''', 'simple.cpp', file_options)
+    assert(converted == [
+        FileContent("simple.cpp", ContentType.MODULE_IMPL,
+'''module simple;
+'''),
+])
+
+def test_module_impl_include_assert_and_self_header_compat():
+    converter = Converter(ConvertAction.MODULES)
+    file_options = FileOptions()
+    file_options.convert_as_compat = True
+    converted = converter.convert_file_content(
+'''#include "assert.h"
+#include "simple.h"
+''', 'simple.cpp', file_options)
+    assert(converted == [
+        FileContent("simple.cpp", ContentType.MODULE_IMPL,
+'''module;
+#include "assert.h"
+module simple;
+'''),
+])
 
 def test_resolve_include():
     converter = Converter(ConvertAction.MODULES)

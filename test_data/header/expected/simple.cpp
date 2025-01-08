@@ -1,6 +1,6 @@
+#include "simple.h"
 
 #include <string>
-#include "simple.h"
 
 namespace TestNS
 {

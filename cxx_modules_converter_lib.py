@@ -305,7 +305,8 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.module_name = name
 
     def set_is_actually_module(self) -> None:
-        raise NotImplementedError('set_is_actually_module')
+        if self.global_module_fragment:
+            self.set_global_module_fragment_start()
 
     def get_is_actually_module(self) -> bool:
         raise NotImplementedError('get_is_actually_module')
@@ -469,8 +470,9 @@ class ModuleBaseBuilder(FileBaseBuilder):
         line_include_filename = match[3]
         line_tail = match[4]
 
-        if any_pattern_maches(self.options.always_include_names, PurePosixPath(line_include_filename)):
-            self.add_module_content(line)
+        resolved_include_filename = self.resolver.resolve_include(line_include_filename)
+        if any_pattern_maches(self.options.always_include_names, resolved_include_filename):
+            self.add_global_module_fragment(line)
             return
         
         line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename)
@@ -561,6 +563,7 @@ module <name>;             // Start of module purview.
 
     def set_is_actually_module(self) -> None:
         self._is_actually_module = True
+        super().set_is_actually_module()
 
     def get_is_actually_module(self) -> bool:
         return self._is_actually_module
