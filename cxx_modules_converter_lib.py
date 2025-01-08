@@ -246,6 +246,8 @@ preprocessor_define_rx = re.compile(r'''^\s*#\s*define.*''')
 # regex: #pragma
 # regex: #warning
 preprocessor_other_rx = re.compile(r'''^\s*#\s*(error|elif|else|pragma|warning).*''')
+# regex: #pragma once
+preprocessor_pragma_once_rx = re.compile(r'''^\s*#\s*pragma\s+once.*$''')
 
 class FileBaseBuilder:
     content_type: ContentType = ContentType.OTHER
@@ -456,6 +458,9 @@ class ModuleBaseBuilder(FileBaseBuilder):
             self.add_compat_include(line)
         self.add_module_import_from_include(line, match)
 
+    def handle_pragma_once(self, line: str):
+        self._add_module_staging(f'''// {line}''', 0)
+
     def add_module_import_from_include(self, line: str, match: re.Match[str] | None = None):
         self.set_module_purview_start()
         if not match:
@@ -658,6 +663,8 @@ class Converter:
                         builder.handle_system_include(line)
                     elif m.match(preprocessor_include_local_rx, line):
                         builder.handle_local_include(line, m.matched)
+                    elif m.match(preprocessor_pragma_once_rx, line):
+                        builder.handle_pragma_once(line)
                     elif (m.match(preprocessor_line_comment_rx, line)
                           or m.match(preprocessor_other_rx, line)
                           or m.match(spaces_rx, line)):

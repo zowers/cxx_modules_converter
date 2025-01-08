@@ -260,6 +260,21 @@ export module simple;
 import local_include;
 ''')
 
+def test_module_include_pragma_once():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#pragma once
+#include "local_include.h"
+#include <vector>
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#include <vector>
+export module simple;
+// #pragma once
+import local_include;
+''')
+
 def test_module_include_system_pragma_define():
     converted = convert_file_content(
         ConvertAction.MODULES,
