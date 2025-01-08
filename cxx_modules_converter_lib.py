@@ -780,7 +780,6 @@ class Converter:
 def any_pattern_maches(patterns: list[str], filename: PurePosixPath) -> bool:
     for skip_pattern in patterns:
         if filename.match(skip_pattern):
-            print(f'skipping "f{filename}"')
             return True
     return False
 
