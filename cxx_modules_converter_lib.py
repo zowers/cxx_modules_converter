@@ -352,7 +352,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.flushed_global_module_fragment_includes_count = 0
         if self.preprocessor_nesting_count != 0:
             return
-        if self.global_module_fragment_includes_count == 0:
+        if self.global_module_fragment_includes_count == 0 and not self.convert_as_compat_header():
             return
         self.set_global_module_fragment_start()
         for line in self.global_module_fragment_staging:
@@ -592,8 +592,11 @@ class CompatHeaderBuilder(FileBaseBuilder):
             f'''#pragma once''',
             f'''#ifndef {compat_macro}''',
             f'''#define {compat_macro}''',
-            f'''#endif''',
             f'''#include "{relative_module_interface_unit_filename}"''',
+            f'''#undef {compat_macro}''',
+            f'''#else''',
+            f'''#include "{relative_module_interface_unit_filename}"''',
+            f'''#endif''',
         ]
         return new_line.join(parts) + new_line
 

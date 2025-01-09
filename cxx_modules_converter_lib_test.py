@@ -927,8 +927,11 @@ export module empty;
 '''#pragma once
 #ifndef CXX_COMPAT_HEADER
 #define CXX_COMPAT_HEADER
-#endif
 #include "empty.cppm"
+#undef CXX_COMPAT_HEADER
+#else
+#include "empty.cppm"
+#endif
 '''),
 ])
 
@@ -958,8 +961,11 @@ import local_include;
 '''#pragma once
 #ifndef CXX_COMPAT_HEADER
 #define CXX_COMPAT_HEADER
-#endif
 #include "simple.cppm"
+#undef CXX_COMPAT_HEADER
+#else
+#include "simple.cppm"
+#endif
 '''),
 ])
 
@@ -991,8 +997,11 @@ import local_include;
 '''#pragma once
 #ifndef CXX_COMPAT_HEADER
 #define CXX_COMPAT_HEADER
-#endif
 #include "simple.cppm"
+#undef CXX_COMPAT_HEADER
+#else
+#include "simple.cppm"
+#endif
 '''),
 ])
 

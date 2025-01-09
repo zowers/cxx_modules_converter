@@ -5,6 +5,7 @@ module;
 #include "local_include.h"
 #endif
 #include <vector>
+
 #ifndef CXX_COMPAT_HEADER
 export module simple;
 #endif
