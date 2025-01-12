@@ -7,7 +7,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
-from typing import Any
 
 from cxx_modules_converter_lib import (
     Converter, 
@@ -44,7 +43,8 @@ def parse_args(argv: list[str] | None = None):
 def log(message: str):
     print('cxx_modules_converter:', message)
 
-def main(parsed_args: Any):
+def main():
+    parsed_args = parse_args()
     log_messages: list[str] = []
     log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {"inplace" if parsed_args.inplace else " into " + parsed_args.destination}')
     if parsed_args.inplace:
@@ -82,5 +82,4 @@ def main(parsed_args: Any):
     log('done ' + log_text)
 
 if __name__ == '__main__':
-    parsed_args = parse_args()
-    sys.exit(main(parsed_args))
+    sys.exit(main())
