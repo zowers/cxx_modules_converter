@@ -36,6 +36,12 @@ class Options:
         self.skip_patterns: list[str] = []
         self.compat_patterns: list[str] = []
         self.compat_macro: str = COMPAT_MACRO_DEFAULT
+        self.export: dict[str, set[str]] = {}
+
+    def add_export_module(self, owner: str, export: str):
+        owner_exports = self.export.setdefault(owner, set())
+        owner_exports.add(export)
+
 
 class FileOptions:
     def __init__(self):
@@ -485,7 +491,12 @@ class ModuleBaseBuilder(FileBaseBuilder):
             self.set_is_actually_module()
             self.set_module_purview_start()
             return
-        import_line = f'{line_space1}{line_space2}import {line_module_name};{line_tail}'
+        export_opt = ''
+        if self.content_type == ContentType.MODULE_INTERFACE:
+            owner_exports = self.options.export.get(self.module_name)
+            if owner_exports and line_module_name in owner_exports:
+                export_opt = '''export ''';
+        import_line = f'''{line_space1}{line_space2}{export_opt}import {line_module_name};{line_tail}'''
         import_lines = self.wrap_in_compat_macro_if_compat_header([import_line])
         for import_line in import_lines:
             self.add_module_content(import_line)

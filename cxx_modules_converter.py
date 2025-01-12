@@ -12,7 +12,7 @@ from cxx_modules_converter_lib import (
     Converter, 
     ConvertAction,
     COMPAT_MACRO_DEFAULT,
-    always_include_names
+    always_include_names,
 )
 
 def parse_args(argv: list[str] | None = None):
@@ -37,6 +37,7 @@ def parse_args(argv: list[str] | None = None):
                         + ' will be converted in compatibility mode allowing to use as either module or header')
     parser.add_argument('-m', '--compat-macro', default=COMPAT_MACRO_DEFAULT, help='compatibility macro name used in compat modules and headers')
     parser.add_argument('-e', '--header', action='append', default=always_include_names, help='always include headers with matching names and copy them as is')
+    parser.add_argument('--export', action='append', default=[], help='A=B means module A exports module B, i.e. `--export A=B` means module A will have `export import B;`')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
@@ -76,6 +77,10 @@ def main():
     for header in parsed_args.header:
         log_messages.append(f'header: "{header}"')
         converter.options.always_include_names.append(header)
+    for export_pair in parsed_args.export:
+        owner, export = export_pair.split('=')
+        log_messages.append(f'export: "{owner}" exports "{export}"')
+        converter.options.add_export_module(owner, export)
     log_text = '\n'.join(log_messages)
     log(log_text)
     converter.convert_directory(directory, Path(destination))

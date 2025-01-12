@@ -587,6 +587,33 @@ module simple;
 '''),
 ])
 
+def test_module_interface_export():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_export_module('simple', 'simple_fwd')
+    converted = converter.convert_file_content(
+'''#include "simple_fwd.h"
+#include "simple2.h"
+''', 'simple.h')
+    assert(converted[0].content == 
+'''export module simple;
+export import simple_fwd;
+import simple2;
+''')
+
+def test_module_impl_export():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_export_module('simple', 'simple_fwd')
+    converted = converter.convert_file_content(
+'''#include "simple.h"
+#include "simple_fwd.h"
+#include "simple2.h"
+''', 'simple.cpp')
+    assert(converted[0].content == 
+'''module simple;
+import simple_fwd;
+import simple2;
+''')
+
 def test_resolve_include():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('subdir/simple.cpp', ContentType.CXX)
