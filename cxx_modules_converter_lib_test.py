@@ -614,6 +614,57 @@ import simple_fwd;
 import simple2;
 ''')
 
+def test_module_interface_export_suffix():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.export_suffixes.append('_fwd')
+    converted = converter.convert_file_content(
+'''#include "simple_fwd.h"
+#include "simple2.h"
+#include "simple2_fwd.h"
+''', 'simple.h')
+    assert(converted[0].content == 
+'''export module simple;
+export import simple_fwd;
+import simple2;
+import simple2_fwd;
+''')
+
+def test_module_impl_export_suffix():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.export_suffixes.append('_fwd')
+    converted = converter.convert_file_content(
+'''#include "simple.h"
+#include "simple_fwd.h"
+#include "simple2.h"
+''', 'simple.cpp')
+    assert(converted[0].content == 
+'''module simple;
+import simple_fwd;
+import simple2;
+''')
+
+def test_module_interface_export_suffix_named():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.export_suffixes.append('_fwd')
+    converter.options.root_dir_module_name = 'org'
+    converter.resolver.files_map.add_files_map_dict({
+        'simple.h': FileEntryType.FILE,
+        'simple_fwd.h': FileEntryType.FILE,
+        'simple2.h': FileEntryType.FILE,
+        'simple2_fwd.h': FileEntryType.FILE,
+    })
+    converted = converter.convert_file_content(
+'''#include "simple_fwd.h"
+#include "simple2.h"
+#include "simple2_fwd.h"
+''', 'simple.h')
+    assert(converted[0].content == 
+'''export module org.simple;
+export import org.simple_fwd;
+import org.simple2;
+import org.simple2_fwd;
+''')
+
 def test_resolve_include():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('subdir/simple.cpp', ContentType.CXX)

@@ -37,6 +37,7 @@ class Options:
         self.compat_patterns: list[str] = []
         self.compat_macro: str = COMPAT_MACRO_DEFAULT
         self.export: dict[str, set[str]] = {}
+        self.export_suffixes: list[str] = []
 
     def add_export_module(self, owner: str, export: str):
         owner_exports = self.export.setdefault(owner, set())
@@ -491,15 +492,24 @@ class ModuleBaseBuilder(FileBaseBuilder):
             self.set_is_actually_module()
             self.set_module_purview_start()
             return
-        export_opt = ''
-        if self.content_type == ContentType.MODULE_INTERFACE:
-            owner_exports = self.options.export.get(self.module_name)
-            if owner_exports and line_module_name in owner_exports:
-                export_opt = '''export ''';
+
+        export_opt = '''export ''' if self._needs_export_for_import(line_module_name) else ''
+
         import_line = f'''{line_space1}{line_space2}{export_opt}import {line_module_name};{line_tail}'''
         import_lines = self.wrap_in_compat_macro_if_compat_header([import_line])
         for import_line in import_lines:
             self.add_module_content(import_line)
+    
+    def _needs_export_for_import(self, import_module_name: str) -> bool:
+        if self.content_type != ContentType.MODULE_INTERFACE:
+            return False
+        owner_exports = self.options.export.get(self.module_name)
+        if owner_exports and import_module_name in owner_exports:
+            return True
+        for suffix in self.options.export_suffixes:
+            if self.module_name + suffix == import_module_name:
+                return True
+        return False
 
     def add_compat_include(self, line: str):
         self.set_global_module_fragment_start()

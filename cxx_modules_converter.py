@@ -38,6 +38,7 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('-m', '--compat-macro', default=COMPAT_MACRO_DEFAULT, help='compatibility macro name used in compat modules and headers')
     parser.add_argument('-e', '--header', action='append', default=always_include_names, help='always include headers with matching names and copy them as is')
     parser.add_argument('--export', action='append', default=[], help='A=B means module A exports module B, i.e. `--export A=B` means module A will have `export import B;`')
+    parser.add_argument('--exportsuffix', action='append', default=[], help='export module suffix for which `export import` is used instead of simple `import`')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
@@ -81,6 +82,9 @@ def main():
         owner, export = export_pair.split('=')
         log_messages.append(f'export: "{owner}" exports "{export}"')
         converter.options.add_export_module(owner, export)
+    for export_suffix in parsed_args.exportsuffix:
+        log_messages.append(f'export suffix: "{export_suffix}"')
+        converter.options.export_suffixes.append(export_suffix)
     log_text = '\n'.join(log_messages)
     log(log_text)
     converter.convert_directory(directory, Path(destination))
