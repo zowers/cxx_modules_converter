@@ -641,6 +641,10 @@ class Converter:
         self.action = action
         self.options = Options()
         self.resolver = FilesResolver(self.options)
+        self.all_files = 0
+        self.convertable_files = 0
+        self.converted_files = 0
+        self.copied_files = 0
     
     def convert_file_content_to_module(self, content: str, filename: Path, content_type: ContentType, file_options: FileOptions) -> FileContentList:
         if content_type in {ContentType.MODULE_INTERFACE, ContentType.MODULE_IMPL}:
@@ -752,19 +756,41 @@ class Converter:
         for converted_file in converted_files:
             converted_content = converted_file.content
             converted_filename = converted_file.filename
-            with open(destination_directory.joinpath(converted_filename), 'w') as destination_file:
-                destination_file.write(converted_content)
+            self._create_or_update_file_content_if_diff(destination_directory.joinpath(converted_filename), converted_content)
         return converted_files
+    
+    def _create_or_update_file_content_if_diff(self, file_path: Path, content: str):
+        if file_path.exists():
+            with open(file_path, 'r') as existing_destination_file:
+                existing_file_content = existing_destination_file.read()
+                if existing_file_content == content:
+                    return
+        with open(file_path, 'w') as destination_file:
+            destination_file.write(content)
+        self.converted_files += 1
 
     def convert_or_copy_file(self, source_directory: Path, destination_directory: Path, filename: Path, file_options: FileOptions):
+        self.all_files += 1
         content_type = get_source_content_type(self.action, filename)
         if content_type == ContentType.OTHER or any_pattern_maches(self.options.always_include_names, PurePosixPath(filename)):
-            shutil.copy2(source_directory.joinpath(filename), destination_directory.joinpath(filename))
+            self._copy_file_content_if_diff(source_directory.joinpath(filename), destination_directory.joinpath(filename))
         else:
             print('converting', filename)
             converted_files = self.convert_file(source_directory, destination_directory, filename, file_options)
             for converted_file in converted_files:
                 print('converted ', converted_file.filename, '\t', converted_file.content_type)
+
+    def _copy_file_content_if_diff(self, source_file_path: Path, destination_file_path: Path):
+        self.convertable_files += 1
+        with open(source_file_path, 'rb') as source_file:
+            source_file_content = source_file.read()
+        if destination_file_path.exists():
+            with open(destination_file_path, 'rb') as existing_destination_file:
+                existing_file_content = existing_destination_file.read()
+                if existing_file_content == source_file_content:
+                    return
+        shutil.copy2(source_file_path, destination_file_path)
+        self.copied_files += 1
 
     def convert_directory(self, source_directory: Path, destination_directory: Path):
         if self.options.root_dir and self.options.root_dir != Path() and source_directory != self.options.root_dir:

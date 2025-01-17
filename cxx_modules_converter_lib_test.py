@@ -1256,3 +1256,22 @@ def test_dir_header(dir_simple: Path):
         'simple.cpp',
     ])
 
+def test_dir_twice(dir_simple: Path):
+    data_directory = Path('test_data/twice')
+    converter = Converter(ConvertAction.MODULES)
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.cppm',
+        'simple.cpp',
+        'other.txt',
+    ])
+    assert(converter.all_files == 3)
+    assert(converter.convertable_files == 2)
+    assert(converter.converted_files == 2)
+    assert(converter.copied_files == 1)
+    converter = Converter(ConvertAction.MODULES)
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert(converter.all_files == 3)
+    assert(converter.convertable_files == 2)
+    assert(converter.converted_files == 0)
+    assert(converter.copied_files == 0)
