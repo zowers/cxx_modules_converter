@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 from pathlib import Path
 import sys
 
@@ -15,13 +16,22 @@ from cxx_modules_converter_lib import (
     always_include_names,
 )
 
+def get_version() -> str | None:
+    try:
+        metadata_version = importlib.metadata.version('cxx_modules_converter')
+        if metadata_version:
+            return metadata_version
+    except importlib.metadata.PackageNotFoundError:
+        return 'not-installed'
+
 def parse_args(argv: list[str] | None = None):
+    version = get_version()
     parser = argparse.ArgumentParser(
                     prog='cxx_modules_converter',
-                    description='Convert C++20 modules to headers and headers to modules',
+                    description=f'Convert C++20 modules to headers and headers to modules, version: {version}',
                     epilog='')
     directory = '.'
-    parser.add_argument('-s','--directory', default=directory, required=True, help='the directory with files')
+    parser.add_argument('-s','--directory', default=directory, help='the directory with files')
     parser.add_argument('-i', '--inplace', default=False, action='store_true', help='convert files in the same directory or put conversion result to destination')
     parser.add_argument('-d', '--destination', default=directory, help='destination directory where to put conversion result, ignored when --inplace is provided')
     parser.add_argument('-a', '--action', default=ConvertAction.MODULES, 
@@ -39,6 +49,7 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('-e', '--header', action='append', default=always_include_names, help='always include headers with matching names and copy them as is')
     parser.add_argument('--export', action='append', default=[], help='A=B means module A exports module B, i.e. `--export A=B` means module A will have `export import B;`')
     parser.add_argument('--exportsuffix', action='append', default=[], help='export module suffix for which `export import` is used instead of simple `import`')
+    parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
@@ -47,6 +58,13 @@ def log(message: str):
 
 def main():
     parsed_args = parse_args()
+    if parsed_args.version:
+        version = get_version()
+        log(f'{version}')
+        return
+    if not parsed_args.directory:
+        log('--directory argument is required')
+        return 1
     log_messages: list[str] = []
     log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {"inplace" if parsed_args.inplace else " into " + parsed_args.destination}')
     if parsed_args.inplace:
