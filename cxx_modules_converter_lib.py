@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 
-from typing import Any
+from typing import Any, cast
 try:
     # make pylance happy
     from typing import TypeAlias as TypeAlias2
@@ -192,6 +192,8 @@ destination_ext_types: ActionExtTypes = {
     ConvertAction.MODULES: headers_ext_types,
 }
 
+interface_content_types: set[ContentType] = {ContentType.MODULE_INTERFACE, ContentType.HEADER}
+
 def get_source_content_type(action: ConvertAction, filename: Path) -> ContentType:
     parts = os.path.splitext(filename)
     extension = parts[-1]
@@ -319,6 +321,9 @@ class ModuleBaseBuilder(FileBaseBuilder):
 
     def get_is_actually_module(self) -> bool:
         raise NotImplementedError('get_is_actually_module')
+
+    def get_module_interface_builder(self) -> ModuleInterfaceUnitBuilder | None:
+        raise NotImplementedError('get_module_interface_builder')
 
     def set_global_module_fragment_start(self):
         if self.global_module_fragment_start:
@@ -518,6 +523,12 @@ class ModuleBaseBuilder(FileBaseBuilder):
     def build_result(self):
         if self.global_module_fragment or self.global_module_fragment_compat_includes:
             assert(bool(self.global_module_fragment_start) == self.get_is_actually_module())
+        module_interface_builder = self.get_module_interface_builder()
+        if (self.content_type == ContentType.MODULE_IMPL and self.get_is_actually_module()
+            and module_interface_builder and module_interface_builder.global_module_fragment):
+            # include interface GMF at the start of impl GMF
+            self.set_global_module_fragment_start()
+            self.global_module_fragment = module_interface_builder.global_module_fragment + self.global_module_fragment
         self._flush_module_staging()
         self._mark_module_interface_unit_export()
         parts = [
@@ -564,6 +575,9 @@ export module <name>;      // Start of module purview.
         '''module interface unit is always actually module'''
         return True
 
+    def get_module_interface_builder(self) -> ModuleInterfaceUnitBuilder | None:
+        return None
+
 class ModuleImplUnitBuilder(ModuleBaseBuilder):
     content_type = ContentType.MODULE_IMPL
     '''
@@ -586,6 +600,7 @@ module <name>;             // Start of module purview.
     def __init__(self, options: Options, parent_resolver: FilesResolver, file_options: FileOptions):
         super().__init__(options, parent_resolver, file_options)
         self._is_actually_module = False
+        self.module_interface_builder: ModuleInterfaceUnitBuilder | None = None
 
     def set_is_actually_module(self) -> None:
         self._is_actually_module = True
@@ -594,6 +609,11 @@ module <name>;             // Start of module purview.
     def get_is_actually_module(self) -> bool:
         return self._is_actually_module
 
+    def get_module_interface_builder(self) -> ModuleInterfaceUnitBuilder | None:
+        return self.module_interface_builder
+
+    def set_module_interface_builder(self, module_interface_builder: ModuleInterfaceUnitBuilder | None):
+        self.module_interface_builder = module_interface_builder
 
 class CompatHeaderBuilder(FileBaseBuilder):
     content_type = ContentType.HEADER
@@ -645,6 +665,7 @@ class Converter:
         self.convertable_files = 0
         self.converted_files = 0
         self.copied_files = 0
+        self.module_interface_builders: dict[str, ModuleInterfaceUnitBuilder] = {}
     
     def convert_file_content_to_module(self, content: str, filename: Path, content_type: ContentType, file_options: FileOptions) -> FileContentList:
         if content_type in {ContentType.MODULE_INTERFACE, ContentType.MODULE_IMPL}:
@@ -729,6 +750,11 @@ class Converter:
                 raise RuntimeError(f'Unknown content type {content_type}')
         
         builder.set_source_filename(filename)
+
+        if content_type == ContentType.HEADER:
+            self.module_interface_builders[builder.module_name] = cast(ModuleInterfaceUnitBuilder, builder)
+        elif content_type == ContentType.CXX:
+            cast(ModuleImplUnitBuilder, builder).set_module_interface_builder(self.module_interface_builders.get(builder.module_name, None))
         return builder
 
     def convert_file_content_to_headers(self, content: str, filename: Path, content_type: ContentType, file_options: FileOptions) -> FileContentList:
@@ -750,6 +776,7 @@ class Converter:
             raise RuntimeError(f'Unknown action: "{action}"')
 
     def convert_file(self, source_directory: Path, destination_directory: Path, filename: Path, file_options: FileOptions) -> FileContentList:
+        self.convertable_files += 1
         with open(source_directory.joinpath(filename)) as source_file:
             source_content = source_file.read()
         converted_files = self.convert_file_content(source_content, filename, file_options)
@@ -781,7 +808,6 @@ class Converter:
                 print('converted ', converted_file.filename, '\t', converted_file.content_type)
 
     def _copy_file_content_if_diff(self, source_file_path: Path, destination_file_path: Path):
-        self.convertable_files += 1
         with open(source_file_path, 'rb') as source_file:
             source_file_content = source_file.read()
         if destination_file_path.exists():
@@ -808,7 +834,8 @@ class Converter:
         source_directory_w_subdir = source_directory.joinpath(subdir or '')
         destination_directory_w_subdir = destination_directory.joinpath(subdir or '')
         destination_directory_w_subdir.mkdir(parents=True, exist_ok=True)
-        for filepath in source_directory_w_subdir.iterdir():
+        for filepath in sorted(source_directory_w_subdir.iterdir(),
+                               key = lambda filepath: self.interface_then_impl_key(filepath)):
             filename = filepath.relative_to(source_directory)
             if any_pattern_maches(self.options.skip_patterns, PurePosixPath(filename)):
                 print(f'skipping "{filename}"')
@@ -818,6 +845,13 @@ class Converter:
                 self.convert_or_copy_file(source_directory, destination_directory, filename, next_file_options)
             if filepath.is_dir():
                 self.convert_directory_impl(source_directory, destination_directory, filename, next_file_options)
+
+    def interface_then_impl_key(self, file_path: Path):
+        content_type = get_source_content_type(self.action, file_path)
+        if content_type in interface_content_types:
+            return 0
+        return 1
+
 
     def make_next_file_options(self, file_options: FileOptions, filename: Path):
         next_file_options = copy.copy(file_options)
