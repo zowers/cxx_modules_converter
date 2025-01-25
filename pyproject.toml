@@ -1,6 +1,6 @@
 [project]
 name = "cxx-modules-converter"
-version = "0.1.6"
+version = "0.1.7"
 description = "Convert C++20 modules to headers and headers to modules"
 authors = [
     {name = "Alexander Petrov", email = "zowers@zowers.net"}

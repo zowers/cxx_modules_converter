@@ -666,6 +666,19 @@ import simple_fwd;
 import simple2;
 ''')
 
+def test_module_interface_export_star():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_export_module('simple', '*')
+    converted = converter.convert_file_content(
+'''#include "simple_fwd.h"
+#include "simple2.h"
+''', 'simple.h')
+    assert(converted[0].content == 
+'''export module simple;
+export import simple_fwd;
+export import simple2;
+''')
+
 def test_module_interface_export_suffix():
     converter = Converter(ConvertAction.MODULES)
     converter.options.export_suffixes.append('_fwd')

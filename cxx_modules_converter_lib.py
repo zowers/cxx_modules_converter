@@ -27,6 +27,7 @@ always_include_names = [
 ]
 
 COMPAT_MACRO_DEFAULT: str = "CXX_COMPAT_HEADER"
+STAR_MODULE_EXPORT: str = '*'
 
 class Options:
     def __init__(self):
@@ -521,7 +522,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         if self.content_type != ContentType.MODULE_INTERFACE:
             return False
         owner_exports = self.options.export.get(self.module_name)
-        if owner_exports and import_module_name in owner_exports:
+        if owner_exports and (import_module_name in owner_exports or STAR_MODULE_EXPORT in owner_exports):
             return True
         for suffix in self.options.export_suffixes:
             if self.module_name + suffix == import_module_name:
