@@ -184,8 +184,8 @@ namespace TestNS {}
 #endif // FLAG
 export module simple;
 import local_include;
-
 export {
+
 namespace TestNS {}
 } // export
 ''')
@@ -398,6 +398,58 @@ import local_include;
     && FLAG22
   import local_include_2;
 #endif // FLAG2
+''')
+
+
+def test_module_ifdef_w_content():
+    converted = convert_file_content(
+        ConvertAction.MODULES,
+'''#include "local_include.h"
+#include <vector>
+
+// before preprocessor
+#ifdef FLAG1
+
+// inside preprocessor
+namespace TestNS
+{
+
+namespace Test
+{
+
+class TestClass
+{
+};
+
+} // namespace Test
+} // namespace TestNS
+#endif // FLAG1
+''', 'simple.h')
+    assert(converted == 
+'''module;
+#include <vector>
+export module simple;
+import local_include;
+
+// before preprocessor
+export {
+#ifdef FLAG1
+
+// inside preprocessor
+namespace TestNS
+{
+
+namespace Test
+{
+
+class TestClass
+{
+};
+
+} // namespace Test
+} // namespace TestNS
+#endif // FLAG1
+} // export
 ''')
 
 def test_module_include_system_comment():
@@ -974,8 +1026,8 @@ module;
 #include <vector>
 export module simple;
 import local_include;
-
 export {
+
 namespace TestNS
 {
 namespace Test

@@ -4,8 +4,8 @@ module;
 
 #include <string>
 module simple;
-
 extern "C++" {
+
 namespace TestNS
 {
 namespace Test

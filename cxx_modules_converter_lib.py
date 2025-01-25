@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import copy
 import enum
 import os
@@ -305,6 +306,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements
         self.global_module_fragment_includes_count: int = 0 # count of #include <> statements
         self.flushed_global_module_fragment_includes_count: int = 0 # count of #include <> statements flushed to global module content
+        self.module_staging_last_unnested_index: int = 0 # last index in module staging without opened preprocessor #if statements
 
     def set_source_filename(self, source_filename: Path):
         super().set_source_filename(source_filename)
@@ -399,8 +401,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         # self.module_purview_special_headers.append(line)
 
     def handle_main_content(self, line: str):
-        self._flush_module_staging()
-        self._set_main_module_content_start()
+        self._flush_module_staging(self._set_main_module_content_start)
         self.add_module_content(line)
 
     def _set_main_module_content_start(self):
@@ -441,16 +442,27 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.module_content.append(line)
 
     def _add_module_staging(self, line: str, nesting_advance: int):
+        if (self.preprocessor_nesting_count == 0 and nesting_advance == 0
+            or self.preprocessor_nesting_count == 1 and nesting_advance == 1):
+            self.module_staging_last_unnested_index = len(self.module_staging)
         self.module_staging.append(line)
+        if (self.preprocessor_nesting_count == 0 and nesting_advance == -1):
+            self.module_staging_last_unnested_index = len(self.module_staging)
 
-    def _flush_module_staging(self):
+    def _flush_module_staging(self, last_unnested_inserter: Callable[[], None] | None = None):
         self.set_module_purview_start()
         if self.flushed_global_module_fragment_includes_count == 0 or self.flushed_module_preprocessor_nesting_count != 0:
-            for line in self.module_staging:
+            for i in range(len(self.module_staging)):
+                if last_unnested_inserter and i == self.module_staging_last_unnested_index:
+                    last_unnested_inserter()
+                line = self.module_staging[i]
                 self.module_content.append(line)
+            if last_unnested_inserter and self.module_staging_last_unnested_index == len(self.module_staging):
+                last_unnested_inserter()
         self.module_staging = []
         self.flushed_module_preprocessor_nesting_count = self.preprocessor_nesting_count
         self.flushed_global_module_fragment_includes_count = 0
+        self.module_staging_last_unnested_index = 0
 
     def convert_as_compat_header(self):
         return self.file_options.convert_as_compat and self.content_type == ContentType.MODULE_INTERFACE
