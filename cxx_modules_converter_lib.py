@@ -524,6 +524,9 @@ class ModuleBaseBuilder(FileBaseBuilder):
         owner_exports = self.options.export.get(self.module_name)
         if owner_exports and (import_module_name in owner_exports or STAR_MODULE_EXPORT in owner_exports):
             return True
+        star_owner_exports = self.options.export.get(STAR_MODULE_EXPORT)
+        if star_owner_exports and (import_module_name in star_owner_exports or STAR_MODULE_EXPORT in star_owner_exports):
+            return True
         for suffix in self.options.export_suffixes:
             if self.module_name + suffix == import_module_name:
                 return True

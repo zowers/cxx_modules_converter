@@ -48,7 +48,11 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('-m', '--compat-macro', default=COMPAT_MACRO_DEFAULT, help='compatibility macro name used in compat modules and headers')
     parser.add_argument('-e', '--header', action='append', default=always_include_names, help='always include headers with matching names and copy them as is')
     parser.add_argument('--export', action='append', default=[], 
-                        help='A=B means module A exports module B, i.e. `--export A=B` means module A will have `export import B;`. use `--export "A=*"` to export all imports')
+                        help='A=B means module A exports module B, i.e. `--export A=B` means module A will have `export import B;`.'
+                        + ' use `--export "A=*"` to export all imports.'
+                        + ' use `--export "*=B"` to export B from all modules.'
+                        + ' use `--export "*=*"` to export all from all modules.'
+                        )
     parser.add_argument('--exportsuffix', action='append', default=[], help='export module suffix for which `export import` is used instead of simple `import`')
     parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
