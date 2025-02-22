@@ -414,22 +414,23 @@ class ModuleBaseBuilder(FileBaseBuilder):
             return
         module_start = []
         module_end = []
-        if self.content_type == ContentType.MODULE_INTERFACE:
-            # wrap module interface unit in export {}
-            module_start = [
-                '''export {'''
-            ]
-            module_end = [
-                '''} // export'''
-            ]
         if self.file_options.convert_as_compat:
             # wrap module content in extern "C++" {}
             module_start = [
                 '''extern "C++" {'''
-                ] + module_start
-            module_end = module_end + [
+                ]
+            module_end = [
                 '''} // extern "C++"'''
                 ]
+        if self.content_type == ContentType.MODULE_INTERFACE:
+            # wrap module interface unit in export {}
+            module_start = [
+                '''export {'''
+            ] + module_start
+            module_end = module_end + [
+                '''} // export'''
+            ]
+        if self.file_options.convert_as_compat:
             # wrap in #ifdef CXX_COMPAT_HEADER/#endif
             module_start = self.wrap_in_compat_macro_if_compat_header(module_start)
             module_end = self.wrap_in_compat_macro_if_compat_header(module_end)

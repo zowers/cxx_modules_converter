@@ -14,8 +14,8 @@ import local_include;
 #endif
 
 #ifndef CXX_COMPAT_HEADER
-extern "C++" {
 export {
+extern "C++" {
 #endif
 namespace TestNS
 {
@@ -28,6 +28,6 @@ class TestClass
 } // namespace Test
 } // namespace TestNS
 #ifndef CXX_COMPAT_HEADER
-} // export
 } // extern "C++"
+} // export
 #endif
