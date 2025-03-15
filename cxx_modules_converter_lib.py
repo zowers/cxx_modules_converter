@@ -16,7 +16,7 @@ try:
 except ImportError:
     TypeAlias2 = Any
 TypeAlias = TypeAlias2
-class ConvertAction(enum.Enum):
+class ConvertAction: # (enum.Enum)
     MODULES = 'modules'
     HEADERS = 'headers'
 
