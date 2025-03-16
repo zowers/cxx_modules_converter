@@ -14,6 +14,7 @@ from cxx_modules_converter_lib import (
     ConvertAction,
     COMPAT_MACRO_DEFAULT,
     always_include_names,
+    ContentType,
 )
 
 def get_version() -> str | None:
@@ -54,6 +55,8 @@ def parse_args(argv: list[str] | None = None):
                         + ' use `--export "*=*"` to export all from all modules.'
                         )
     parser.add_argument('--exportsuffix', action='append', default=[], help='export module suffix for which `export import` is used instead of simple `import`')
+    parser.add_argument('--inextheader', action='append', default=[], help='input header file extensions, .h by default. first use replaces the default, subsequent uses append.')
+    parser.add_argument('--inextcxx', action='append', default=[], help='input C++ source file extensions, .cpp by default. first use replaces the default, subsequent uses append.')
     parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
     return parsed_args
@@ -108,6 +111,12 @@ def main():
     for export_suffix in parsed_args.exportsuffix:
         log_messages.append(f'export suffix: "{export_suffix}"')
         converter.options.export_suffixes.append(export_suffix)
+    for ext in parsed_args.inextheader:
+        log_messages.append(f'input header extension: "{ext}"')
+        converter.options.add_module_action_ext_type(ext, ContentType.HEADER)
+    for ext in parsed_args.inextcxx:
+        log_messages.append(f'input C++ source extension: "{ext}"')
+        converter.options.add_module_action_ext_type(ext, ContentType.CXX)
     log_text = '\n'.join(log_messages)
     log(log_text)
     converter.convert_directory(directory, Path(destination))

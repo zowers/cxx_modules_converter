@@ -33,6 +33,15 @@ always_include_names = [
 COMPAT_MACRO_DEFAULT: str = "CXX_COMPAT_HEADER"
 STAR_MODULE_EXPORT: str = '*'
 
+class ContentType(enum.Enum):
+    HEADER = 1
+    CXX = 2
+    MODULE_INTERFACE = 3
+    MODULE_IMPL = 4
+    OTHER = 5
+
+ExtTypes: TypeAlias = dict[str, ContentType]
+
 class Options:
     def __init__(self):
         self.always_include_names = copy.copy(always_include_names)
@@ -44,11 +53,44 @@ class Options:
         self.compat_macro: str = COMPAT_MACRO_DEFAULT
         self.export: dict[str, set[str]] = {}
         self.export_suffixes: list[str] = []
+        self.modules_ext_types: ExtTypes = {
+            '.h': ContentType.HEADER,
+            '.cpp': ContentType.CXX,
+        }
+        self._modules_ext_types_is_default = set(self.modules_ext_types.values())
+        self.headers_ext_types: ExtTypes = {
+            '.cppm': ContentType.MODULE_INTERFACE,
+            '.cpp': ContentType.MODULE_IMPL,
+        }
+        self._headers_ext_types_is_default = set(self.headers_ext_types.values())
 
     def add_export_module(self, owner: str, export: str):
         owner_exports = self.export.setdefault(owner, set())
         owner_exports.add(export)
 
+    def add_module_action_ext_type(self, ext: str, type: ContentType):
+        if not ext.startswith('.'):
+            ext = '.' + ext
+        if type in self._modules_ext_types_is_default:
+            # first add replaces the default
+            self._modules_ext_types_is_default.remove(type)
+            for e in self.modules_ext_types:
+                if self.modules_ext_types[e] == type:
+                    del self.modules_ext_types[e]
+                    break
+        self.modules_ext_types[ext] = type
+
+    def add_header_action_ext_type(self, ext: str, type: ContentType):
+        if not ext.startswith('.'):
+            ext = '.' + ext
+        if type in self._headers_ext_types_is_default:
+            # first add replaces the default
+            self._headers_ext_types_is_default.remove(type)
+            for e in self.headers_ext_types:
+                if self.headers_ext_types[e] == type:
+                    del self.headers_ext_types[e]
+                    break
+        self.headers_ext_types[ext] = type
 
 class FileOptions:
     def __init__(self):
@@ -98,10 +140,20 @@ class FilesMap:
     def add_files_map_dict(self, other: FilesMapDict):
         self.value.update(other)
 
+ActionExtTypes: TypeAlias = dict[ConvertAction, ExtTypes]
+
 class FilesResolver:
     def __init__(self, options: Options):
         self.options: Options = options
         self.files_map = FilesMap()
+        self.source_ext_types: ActionExtTypes = {
+            ConvertAction.MODULES: self.options.modules_ext_types,
+            ConvertAction.HEADERS: self.options.headers_ext_types,
+        }
+        self.destination_ext_types: ActionExtTypes = {
+            ConvertAction.HEADERS: self.options.modules_ext_types,
+            ConvertAction.MODULES: self.options.headers_ext_types,
+        }
     
     def resolve_in_search_path(self, current_dir: Path, current_filename: str|Path, include_filename: str) -> PurePosixPath:
         include_path = PurePosixPath(include_filename)
@@ -127,6 +179,12 @@ class FilesResolver:
         module_name = filename_to_module_name(full_name)
         return module_name
 
+    def get_source_content_type(self, action: ConvertAction, filename: Path) -> ContentType:
+        parts = os.path.splitext(filename)
+        extension = parts[-1]
+        action_ext_types = self.source_ext_types[action]
+        return action_ext_types.get(extension, ContentType.OTHER)
+
 class ModuleFilesResolver:
     def __init__(self, parent_resolver: FilesResolver, options: Options):
         self.parent_resolver: FilesResolver = parent_resolver
@@ -146,13 +204,6 @@ class ModuleFilesResolver:
         resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename)
         result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
         return result
-
-class ContentType(enum.Enum):
-    HEADER = 1
-    CXX = 2
-    MODULE_INTERFACE = 3
-    MODULE_IMPL = 4
-    OTHER = 5
 
 ContentTypeToExt: TypeAlias = dict[ContentType, str]
 content_type_to_ext: ContentTypeToExt = {
@@ -178,33 +229,7 @@ content_type_to_converted: ContentTypeToConverted = {
     ContentType.MODULE_IMPL: ContentType.CXX,
 }
 
-ExtTypes: TypeAlias = dict[str, ContentType]
-modules_ext_types: ExtTypes = {
-    '.h': ContentType.HEADER,
-    '.cpp': ContentType.CXX,
-}
-headers_ext_types: ExtTypes = {
-    '.cppm': ContentType.MODULE_INTERFACE,
-    '.cpp': ContentType.MODULE_IMPL,
-}
-
-ActionExtTypes: TypeAlias = dict[ConvertAction, ExtTypes]
-source_ext_types: ActionExtTypes = {
-    ConvertAction.MODULES: modules_ext_types,
-    ConvertAction.HEADERS: headers_ext_types,
-}
-destination_ext_types: ActionExtTypes = {
-    ConvertAction.HEADERS: modules_ext_types,
-    ConvertAction.MODULES: headers_ext_types,
-}
-
 interface_content_types: set[ContentType] = {ContentType.MODULE_INTERFACE, ContentType.HEADER}
-
-def get_source_content_type(action: ConvertAction, filename: Path) -> ContentType:
-    parts = os.path.splitext(filename)
-    extension = parts[-1]
-    action_ext_types = source_ext_types[action]
-    return action_ext_types.get(extension, ContentType.OTHER)
 
 def get_converted_content_type(content_type: ContentType) -> ContentType:
     return content_type_to_converted[content_type]
@@ -788,7 +813,7 @@ class Converter:
         if file_options is None:
             file_options = FileOptions()
         action = self.action
-        content_type = get_source_content_type(action, filename)
+        content_type = self.resolver.get_source_content_type(action, filename)
         if action == ConvertAction.MODULES:
             return self.convert_file_content_to_module(content, filename, content_type, file_options)
         elif action == ConvertAction.HEADERS:
@@ -819,7 +844,7 @@ class Converter:
 
     def convert_or_copy_file(self, source_directory: Path, destination_directory: Path, filename: Path, file_options: FileOptions):
         self.all_files += 1
-        content_type = get_source_content_type(self.action, filename)
+        content_type = self.resolver.get_source_content_type(self.action, filename)
         if content_type == ContentType.OTHER or any_pattern_maches(self.options.always_include_names, PurePosixPath(filename)):
             self._copy_file_content_if_diff(source_directory.joinpath(filename), destination_directory.joinpath(filename))
         else:
@@ -868,7 +893,7 @@ class Converter:
                 self.convert_directory_impl(source_directory, destination_directory, filename, next_file_options)
 
     def interface_then_impl_key(self, file_path: Path):
-        content_type = get_source_content_type(self.action, file_path)
+        content_type = self.resolver.get_source_content_type(self.action, file_path)
         if content_type in interface_content_types:
             return 0
         return 1

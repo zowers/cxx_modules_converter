@@ -901,6 +901,35 @@ def test_FilesResolver_convert_filename_to_module_name():
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('subdir1/simple1.h')) == 'org.subdir1.simple1')
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('missing.h')) == 'missing')
 
+def test_FilesResolver_get_source_content_type():
+    options = Options()
+    files_resolver = FilesResolver(options)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.h')) == ContentType.HEADER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.hpp')) == ContentType.OTHER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cpp')) == ContentType.CXX)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cxx')) == ContentType.OTHER)
+    # first use -- replace default
+    options.add_module_action_ext_type(".hpp", ContentType.HEADER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.h')) == ContentType.OTHER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.hpp')) == ContentType.HEADER)
+    # subsequent use -- append (+ no dot)
+    options.add_module_action_ext_type("h", ContentType.HEADER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.h')) == ContentType.HEADER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.hpp')) == ContentType.HEADER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cpp')) == ContentType.CXX)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cxx')) == ContentType.OTHER)
+
+    # first use -- replace default
+    options.add_module_action_ext_type(".cxx", ContentType.CXX)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cpp')) == ContentType.OTHER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cxx')) == ContentType.CXX)
+    # subsequent use -- append
+    options.add_module_action_ext_type(".cpp", ContentType.CXX)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cpp')) == ContentType.CXX)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.cxx')) == ContentType.CXX)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.h')) == ContentType.HEADER)
+    assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.hpp')) == ContentType.HEADER)
+
 def test_module_impl_include_local_self_header_subdir():
     converter = Converter(ConvertAction.MODULES)
     converter.resolver.files_map.add_files_map_dict({
@@ -1366,3 +1395,14 @@ def test_dir_twice(dir_simple: Path):
     assert(converter.convertable_files == 2)
     assert(converter.converted_files == 0)
     assert(converter.copied_files == 0)
+
+def test_dir_inext(dir_simple: Path):
+    data_directory = Path('test_data/inext')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_module_action_ext_type('.hpp', ContentType.HEADER)
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.cppm',
+        'simple2.h',
+        'simple.cpp',
+    ])
