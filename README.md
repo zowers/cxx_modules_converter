@@ -35,6 +35,8 @@ Script can be used as following:
                         export all from all modules.
 * --exportsuffix EXPORTSUFFIX
                         export module suffix for which `export import` is used instead of simple `import`
+* --inextheader INEXTHEADER input header file extensions, .h by default. first use replaces the default, subsequent uses append.
+* --inextcxx INEXTCXX   input C++ source file extensions, .cpp by default. first use replaces the default, subsequent uses append.
 * -v, --version         show version
 
 ## Assumptions
