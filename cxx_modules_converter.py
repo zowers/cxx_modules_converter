@@ -15,6 +15,7 @@ from cxx_modules_converter_lib import (
     COMPAT_MACRO_DEFAULT,
     always_include_names,
     ContentType,
+    Options,
 )
 
 def get_version() -> str | None:
@@ -32,6 +33,7 @@ def parse_args(argv: list[str] | None = None):
                     description=f'Convert C++20 modules to headers and headers to modules, version: {version}',
                     epilog='')
     directory = '.'
+    options = Options()
     parser.add_argument('-s','--directory', default=directory, help='the directory with files')
     parser.add_argument('-i', '--inplace', default=False, action='store_true', help='convert files in the same directory or put conversion result to destination')
     parser.add_argument('-d', '--destination', default=directory, help='destination directory where to put conversion result, ignored when --inplace is provided')
@@ -57,6 +59,8 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('--exportsuffix', action='append', default=[], help='export module suffix for which `export import` is used instead of simple `import`')
     parser.add_argument('--inextheader', action='append', default=[], help='input header file extensions, .h by default. first use replaces the default, subsequent uses append.')
     parser.add_argument('--inextcxx', action='append', default=[], help='input C++ source file extensions, .cpp by default. first use replaces the default, subsequent uses append.')
+    parser.add_argument('--outextmod', help=f'output module interface unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_INTERFACE]}')
+    parser.add_argument('--outextmodimpl', help=f'output module implementation unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_IMPL]}')
     parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
     return parsed_args
@@ -117,6 +121,14 @@ def main():
     for ext in parsed_args.inextcxx:
         log_messages.append(f'input C++ source extension: "{ext}"')
         converter.options.add_module_action_ext_type(ext, ContentType.CXX)
+    if parsed_args.outextmod:
+        ext = parsed_args.outextmod
+        log_messages.append(f'output module interface unit extension: "{ext}"')
+        converter.options.set_output_content_type_to_ext(ContentType.MODULE_INTERFACE, ext)
+    if parsed_args.outextmodimpl:
+        ext = parsed_args.outextmodimpl
+        log_messages.append(f'output module implementation unit extension: "{ext}"')
+        converter.options.set_output_content_type_to_ext(ContentType.MODULE_IMPL, ext)
     log_text = '\n'.join(log_messages)
     log(log_text)
     converter.convert_directory(directory, Path(destination))

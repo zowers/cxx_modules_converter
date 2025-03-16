@@ -37,6 +37,9 @@ Script can be used as following:
                         export module suffix for which `export import` is used instead of simple `import`
 * --inextheader INEXTHEADER input header file extensions, .h by default. first use replaces the default, subsequent uses append.
 * --inextcxx INEXTCXX   input C++ source file extensions, .cpp by default. first use replaces the default, subsequent uses append.
+* --outextmod OUTEXTMOD output module interface unit file extensions. default: .cppm
+  *  e.g. `--outextmod=.ixx` to skip the need to change `/interface /TP` options in msvc (https://learn.microsoft.com/en-us/cpp/build/reference/interface?view=msvc-170)
+* --outextmodimpl OUTEXTMODIMPL  output module implementation unit file extensions. default: .cpp
 * -v, --version         show version
 
 ## Assumptions

@@ -41,6 +41,7 @@ class ContentType(enum.Enum):
     OTHER = 5
 
 ExtTypes: TypeAlias = dict[str, ContentType]
+ContentTypeToExt: TypeAlias = dict[ContentType, str]
 
 class Options:
     def __init__(self):
@@ -63,6 +64,12 @@ class Options:
             '.cpp': ContentType.MODULE_IMPL,
         }
         self._headers_ext_types_is_default = set(self.headers_ext_types.values())
+        self.content_type_to_ext: ContentTypeToExt = {
+            ContentType.HEADER: '.h',
+            ContentType.CXX: '.cpp',
+            ContentType.MODULE_INTERFACE: '.cppm',
+            ContentType.MODULE_IMPL: '.cpp',
+        }
 
     def add_export_module(self, owner: str, export: str):
         owner_exports = self.export.setdefault(owner, set())
@@ -91,6 +98,12 @@ class Options:
                     del self.headers_ext_types[e]
                     break
         self.headers_ext_types[ext] = type
+
+    def set_output_content_type_to_ext(self, type: ContentType, ext: str):
+        if not ext.startswith('.'):
+            ext = '.' + ext
+        assert(ext != '.')
+        self.content_type_to_ext[type] = ext
 
 class FileOptions:
     def __init__(self):
@@ -185,6 +198,12 @@ class FilesResolver:
         action_ext_types = self.source_ext_types[action]
         return action_ext_types.get(extension, ContentType.OTHER)
 
+    def convert_filename_to_content_type(self, filename: Path, content_type: ContentType) -> str:
+        parts = os.path.splitext(filename)
+        new_extension = self.options.content_type_to_ext[content_type]
+        new_filename = parts[0] + new_extension
+        return new_filename
+
 class ModuleFilesResolver:
     def __init__(self, parent_resolver: FilesResolver, options: Options):
         self.parent_resolver: FilesResolver = parent_resolver
@@ -204,14 +223,6 @@ class ModuleFilesResolver:
         resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename)
         result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
         return result
-
-ContentTypeToExt: TypeAlias = dict[ContentType, str]
-content_type_to_ext: ContentTypeToExt = {
-    ContentType.HEADER: '.h',
-    ContentType.CXX: '.cpp',
-    ContentType.MODULE_INTERFACE: '.cppm',
-    ContentType.MODULE_IMPL: '.cpp',
-}
 
 ContentTypeToName: TypeAlias = dict[ContentType, str]
 content_type_to_name: ContentTypeToName = {
@@ -233,12 +244,6 @@ interface_content_types: set[ContentType] = {ContentType.MODULE_INTERFACE, Conte
 
 def get_converted_content_type(content_type: ContentType) -> ContentType:
     return content_type_to_converted[content_type]
-
-def convert_filename_to_content_type(filename: Path, content_type: ContentType):
-    parts = os.path.splitext(filename)
-    new_extension = content_type_to_ext[content_type]
-    new_filename = parts[0] + new_extension
-    return new_filename
 
 class FileContent:
     def __init__(self, filename: str|Path, content_type: ContentType, content: str):
@@ -292,15 +297,16 @@ preprocessor_pragma_once_rx = re.compile(r'''^\s*#\s*pragma\s+once.*$''')
 class FileBaseBuilder:
     content_type: ContentType = ContentType.OTHER
 
-    def __init__(self, options: Options):
+    def __init__(self, options: Options, parent_resolver: FilesResolver):
         self.options: Options = options
+        self.parent_resolver: FilesResolver = parent_resolver
         self.source_filename: Path = Path('')
 
     def set_source_filename(self, source_filename: Path):
         self.source_filename = source_filename
 
     def converted_filename(self) -> str:
-        return convert_filename_to_content_type(self.source_filename, self.content_type)
+        return self.parent_resolver.convert_filename_to_content_type(self.source_filename, self.content_type)
 
     def build_result(self) -> str:
         raise NotImplementedError('build_result')
@@ -314,8 +320,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
     content_type: ContentType = ContentType.OTHER
 
     def __init__(self, options: Options, parent_resolver: FilesResolver, file_options: FileOptions):
-        super().__init__(options)
-        self.parent_resolver: FilesResolver = parent_resolver
+        super().__init__(options, parent_resolver)
         self.file_options: FileOptions = file_options
         self.resolver: ModuleFilesResolver = ModuleFilesResolver(self.parent_resolver, self.options)
         self.module_name: str = ''                   # name of the module
@@ -664,7 +669,7 @@ module <name>;             // Start of module purview.
 class CompatHeaderBuilder(FileBaseBuilder):
     content_type = ContentType.HEADER
     def __init__(self, options: Options, module_builder: ModuleBaseBuilder):
-        super().__init__(options)
+        super().__init__(options, module_builder.parent_resolver)
         self.module_builder: ModuleBaseBuilder = module_builder
         assert(module_builder.content_type == ContentType.MODULE_INTERFACE)
         module_interface_unit_filename: str = module_builder.converted_filename()

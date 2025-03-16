@@ -930,6 +930,16 @@ def test_FilesResolver_get_source_content_type():
     assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.h')) == ContentType.HEADER)
     assert(files_resolver.get_source_content_type(ConvertAction.MODULES,  Path('test.hpp')) == ContentType.HEADER)
 
+def test_FilesResolver_convert_filename_to_content_type():
+    options = Options()
+    files_resolver = FilesResolver(options)
+    assert(files_resolver.convert_filename_to_content_type(Path('test.h'), ContentType.MODULE_INTERFACE) == 'test.cppm')
+    assert(files_resolver.convert_filename_to_content_type(Path('test.cpp'), ContentType.MODULE_IMPL) == 'test.cpp')
+    options.set_output_content_type_to_ext(ContentType.MODULE_INTERFACE, '.ixx')
+    options.set_output_content_type_to_ext(ContentType.MODULE_IMPL, 'cxx')
+    assert(files_resolver.convert_filename_to_content_type(Path('test.h'), ContentType.MODULE_INTERFACE) == 'test.ixx')
+    assert(files_resolver.convert_filename_to_content_type(Path('test.cpp'), ContentType.MODULE_IMPL) == 'test.cxx')
+
 def test_module_impl_include_local_self_header_subdir():
     converter = Converter(ConvertAction.MODULES)
     converter.resolver.files_map.add_files_map_dict({
@@ -1405,4 +1415,16 @@ def test_dir_inext(dir_simple: Path):
         'simple.cppm',
         'simple2.h',
         'simple.cpp',
+    ])
+
+def test_dir_outext(dir_simple: Path):
+    data_directory = Path('test_data/outext')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.set_output_content_type_to_ext(ContentType.MODULE_INTERFACE, '.ixx')
+    converter.options.set_output_content_type_to_ext(ContentType.MODULE_IMPL, '.cxx')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.ixx',
+        'simple.cxx',
+        'simple2.hpp',
     ])
