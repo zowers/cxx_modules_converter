@@ -168,22 +168,24 @@ class FilesResolver:
             ConvertAction.MODULES: self.options.headers_ext_types,
         }
     
-    def resolve_in_search_path(self, current_dir: Path, current_filename: str|Path, include_filename: str) -> PurePosixPath:
+    def resolve_in_search_path(self, current_dir: Path, current_filename: str|Path, include_filename: str, is_quote: bool) -> PurePosixPath | None:
         include_path = PurePosixPath(include_filename)
         # search relative to root
         if self.files_map.find(include_path):
             return include_path
         # search relative to current_dir
         full_path = PurePosixPath(current_dir.joinpath(include_path))
-        if self.files_map.find(full_path):
+        if is_quote and self.files_map.find(full_path):
             return full_path
         # search in search_path
         for search_path_item in self.options.search_path:
             path = PurePosixPath(search_path_item).joinpath(include_path)
             if self.files_map.find(path):
                 return path
-        print(f'warning: file not found: "{include_filename}" referenced from "{current_filename}"')
-        return include_path
+        if is_quote:
+            print(f'warning: file not found: "{include_filename}" referenced from "{current_filename}"')
+            return include_path
+        return None
 
     def convert_filename_to_module_name(self, filename: PurePosixPath) -> str:
         full_name = filename
@@ -215,12 +217,14 @@ class ModuleFilesResolver:
         self.module_filename = filename
         self.module_dir = self.module_filename.parent
 
-    def resolve_include(self, include_filename: str) -> PurePosixPath:
-        result = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename)
+    def resolve_include(self, include_filename: str, is_quote: bool) -> PurePosixPath | None:
+        result = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename, is_quote)
         return result
 
-    def resolve_include_to_module_name(self, include_filename: str) -> str:
-        resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename)
+    def resolve_include_to_module_name(self, include_filename: str, is_quote: bool) -> str | None:
+        resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename, is_quote)
+        if resolved_include_filename is None:
+            return None
         result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
         return result
 
@@ -269,10 +273,10 @@ class LineCompatibility(enum.Enum):
 
 # regex: spaces only
 spaces_rx = re.compile(r'''^\s*$''')
-# regex: #include <system_header>
-preprocessor_include_system_rx = re.compile(r'''^(\s*)#(\s*)(include|import)\s*<(.+)>(.*)$''')
-# regex: #include "local_header.h"
-preprocessor_include_local_rx = re.compile(r'''^(\s*)#(\s*)include\s*"(.+)"(.*)$''')
+# regex: #include <brackets_header.h>
+preprocessor_include_brackets_rx = re.compile(r'''^(\s*)#(\s*)include\s*<(.+)>(.*)$''')
+# regex: #include "quote_header.h"
+preprocessor_include_quote_rx = re.compile(r'''^(\s*)#(\s*)include\s*"(.+)"(.*)$''')
 # regex: line comment
 preprocessor_line_comment_rx = re.compile(r'''^\s*//.*$''')
 # regex: block comment start
@@ -411,9 +415,6 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.global_module_fragment_includes_count = 0
         self._flush_module_staging()
 
-    def handle_system_include(self, line: str):
-        self.add_global_module_fragment(line)
-
     def add_global_module_fragment(self, line: str):
         self.global_module_fragment_includes_count += 1
         self._add_global_module_fragment_staging(line, 0)
@@ -513,18 +514,24 @@ class ModuleBaseBuilder(FileBaseBuilder):
         else:
             return lines
 
-    def handle_local_include(self, line: str, match: re.Match[str] | None = None):
+    def handle_include_brackets(self, line: str, match: re.Match[str] | None = None):
         if self.convert_as_compat_header():
             self.add_compat_include(line)
-        self.add_module_import_from_include(line, match)
+        self.add_module_import_from_include(line, match, False)
+        # self.add_global_module_fragment(line)
+
+    def handle_include_quote(self, line: str, match: re.Match[str] | None = None):
+        if self.convert_as_compat_header():
+            self.add_compat_include(line)
+        self.add_module_import_from_include(line, match, True)
 
     def handle_pragma_once(self, line: str):
         self._add_module_staging(f'''// {line}''', 0)
 
-    def add_module_import_from_include(self, line: str, match: re.Match[str] | None = None):
+    def add_module_import_from_include(self, line: str, match: re.Match[str] | None = None, is_quote: bool = False):
         self.set_module_purview_start()
         if not match:
-            match = preprocessor_include_local_rx.match(line)
+            match = preprocessor_include_quote_rx.match(line)
         if not match:
             print('warning: preprocessor_include_local_rx not matched')
             self.add_module_content(line)
@@ -535,12 +542,18 @@ class ModuleBaseBuilder(FileBaseBuilder):
         line_include_filename = match[3]
         line_tail = match[4]
 
-        resolved_include_filename = self.resolver.resolve_include(line_include_filename)
+        resolved_include_filename = self.resolver.resolve_include(line_include_filename, is_quote)
+        if resolved_include_filename is None:
+            self.add_global_module_fragment(line)
+            return
         if any_pattern_maches(self.options.always_include_names, resolved_include_filename):
             self.add_global_module_fragment(line)
             return
         
-        line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename)
+        line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename, is_quote)
+        if line_module_name is None:
+            self.add_global_module_fragment(line)
+            return
         if line_module_name == self.module_name:
             self.set_is_actually_module()
             self.set_module_purview_start()
@@ -759,10 +772,10 @@ class Converter:
                         continue
             elif scanState == HeaderScanState.MAIN:
                     m = Matcher()
-                    if m.match(preprocessor_include_system_rx, line):
-                        builder.handle_system_include(line)
-                    elif m.match(preprocessor_include_local_rx, line):
-                        builder.handle_local_include(line, m.matched)
+                    if m.match(preprocessor_include_brackets_rx, line):
+                        builder.handle_include_brackets(line, m.matched)
+                    elif m.match(preprocessor_include_quote_rx, line):
+                        builder.handle_include_quote(line, m.matched)
                     elif m.match(preprocessor_pragma_once_rx, line):
                         builder.handle_pragma_once(line)
                     elif (m.match(preprocessor_line_comment_rx, line)

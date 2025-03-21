@@ -3,6 +3,7 @@ module;
 #else
 #pragma once
 #include "local_include.h"
+#include <vector>
 #endif
 #include <vector>
 
