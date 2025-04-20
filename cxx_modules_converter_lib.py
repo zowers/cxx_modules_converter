@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 from collections.abc import Callable
 import copy
 import enum
@@ -1100,7 +1101,7 @@ class Converter:
 
 def any_pattern_maches(patterns: list[str], filename: PurePosixPath) -> bool:
     for skip_pattern in patterns:
-        if filename.match(skip_pattern):
+        if fnmatch.fnmatchcase(filename.as_posix(), skip_pattern):
             return True
     return False
 

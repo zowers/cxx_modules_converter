@@ -504,9 +504,27 @@ def test_module_include_always_include_names_options():
 export module simple;
 ''')
 
-def test_module_include_always_include_names_subdir():
+def test_module_include_always_include_names_in_subdir():
     converter = Converter(ConvertAction.MODULES)
     converter.options.always_include_names.append('subdir/options.h')
+    converter.resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'options.h': FileEntryType.FILE,
+            'simple.h': FileEntryType.FILE,
+        },
+    })
+    converted = converter.convert_file_content(
+'''#include "options.h"
+''', 'subdir/simple.h')
+    assert(converted[0].content == 
+'''module;
+#include "options.h"
+export module subdir.simple;
+''')
+
+def test_module_include_always_include_names_subdir():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.always_include_names.append('subdir/*')
     converter.resolver.files_map.add_files_map_dict({
         'subdir': {
             'options.h': FileEntryType.FILE,
@@ -1542,6 +1560,26 @@ def test_dir_header(dir_simple: Path):
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'simple.h',
         'simple.cpp',
+    ])
+
+def test_dir_header_subdir(dir_simple: Path):
+    data_directory = Path('test_data/header_subdir')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.always_include_names.append('subdir/**')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'subdir/simple.h',
+        'subdir/simple.cpp',
+    ])
+
+def test_dir_header_subdir_nested(dir_simple: Path):
+    data_directory = Path('test_data/header_subdir_nested')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.always_include_names.append('subdir/**')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'subdir/nested/simple.h',
+        'subdir/nested/simple.cpp',
     ])
 
 def test_dir_twice(dir_simple: Path):

@@ -24,13 +24,13 @@ Script can be used as following:
 * -I INCLUDE, --include INCLUDE
                         include search path, starting from root or parent directory
 * -n NAME, --name NAME  module name for modules in [root] directory which prefixes all modules
-* -k SKIP, --skip SKIP  skip patterns - files and directories matching any pattern will not be converted or copied
+* -k SKIP, --skip SKIP  skip patterns - files and directories matching any pattern will not be converted or copied (fmatch is used)
 * -c COMPAT, --compat COMPAT
-                        compat patterns - files and directories matching any pattern will be converted in compatibility mode allowing to use as either module or header
+                        compat patterns - files and directories matching any pattern will be converted in compatibility mode allowing to use as either module or header  (fmatch is used)
 * -m COMPAT_MACRO, --compat-macro COMPAT_MACRO
                         compatibility macro name used in compat modules and headers
 * -e HEADER, --header HEADER
-                        always include headers with matching names and copy them as is
+                        always include headers with matching names and copy them as is (fmatch is used)
 * --export EXPORT       A=B means module A exports module B, i.e. `--export A=B` means module A will have `export import B;`. use `--export "A=*"` to export all imports. use `--export "*=B"` to export B from all modules. use `--export "*=*"` to
                         export all from all modules.
 * --exportsuffix EXPORTSUFFIX

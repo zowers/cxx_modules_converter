@@ -44,12 +44,12 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('-p', '--parent', action='store_true', default=False, help='resolve module names starting from parent of source directory')
     parser.add_argument('-I', '--include', action='append', default=[], help='include search path, starting from root or parent directory')
     parser.add_argument('-n', '--name', default='', help='module name for modules in [root] directory which prefixes all modules')
-    parser.add_argument('-k', '--skip', action='append', default=[], help='skip patterns - files and directories matching any pattern will not be converted or copied')
+    parser.add_argument('-k', '--skip', action='append', default=[], help='skip patterns - files and directories matching any pattern will not be converted or copied (fmatch is used)')
     parser.add_argument('-c', '--compat', action='append', default=[],
                         help='compat patterns - files and directories matching any pattern'
-                        + ' will be converted in compatibility mode allowing to use as either module or header')
+                        + ' will be converted in compatibility mode allowing to use as either module or header (fmatch is used)')
     parser.add_argument('-m', '--compat-macro', default=COMPAT_MACRO_DEFAULT, help='compatibility macro name used in compat modules and headers')
-    parser.add_argument('-e', '--header', action='append', default=always_include_names, help='always include headers with matching names and copy them as is')
+    parser.add_argument('-e', '--header', action='append', default=always_include_names, help='always include headers with matching names and copy them as is (fmatch is used)')
     parser.add_argument('--export', action='append', default=[], 
                         help='A=B means module A exports module B, i.e. `--export A=B` means module A will have `export import B;`.'
                         + ' use `--export "A=*"` to export all imports.'
