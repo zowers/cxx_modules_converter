@@ -40,6 +40,11 @@ Script can be used as following:
 * --outextmod OUTEXTMOD output module interface unit file extensions. default: .cppm
   *  e.g. `--outextmod=.ixx` to skip the need to change `/interface /TP` options in msvc (https://learn.microsoft.com/en-us/cpp/build/reference/interface?view=msvc-170)
 * --outextmodimpl OUTEXTMODIMPL  output module implementation unit file extensions. default: .cpp
+* --modules MODULES     `M=P`: start modules tree `M` at path `P`, directory separator is converted to `.` (dot). Default: use directory name and file name as module name.
+* --modulestd MODULESTD
+                        Enable `std` module, i.e. define `--modules vector=std` to replace `vector` and other standard headers to `import std;`.
+* --modulestdcompat MODULESTDCOMPAT
+                        Enable `std.compat` module, i.e. define `--modules vector=std.compat` to replace `vector` and other standard headers to `import std.compat;`.
 * -v, --version         show version
 
 ## Assumptions

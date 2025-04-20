@@ -61,6 +61,9 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('--inextcxx', action='append', default=[], help='input C++ source file extensions, .cpp by default. first use replaces the default, subsequent uses append.')
     parser.add_argument('--outextmod', help=f'output module interface unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_INTERFACE]}')
     parser.add_argument('--outextmodimpl', help=f'output module implementation unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_IMPL]}')
+    parser.add_argument('--modules', action='append', default=[], help='`M=P`: start modules tree `M` at path `P`, directory separator is converted to `.` (dot). Default: use directory name and file name as module name.')
+    parser.add_argument('--modulestd', default=False, help='Enable `std` module, i.e. define `--modules vector=std` to replace `vector` and other standard headers to `import std;`.')
+    parser.add_argument('--modulestdcompat', default=False, help='Enable `std.compat` module, i.e. define `--modules vector=std.compat` to replace `vector` and other standard headers to `import std.compat;`.')
     parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
     return parsed_args
@@ -84,16 +87,16 @@ def main():
     else:
         destination = parsed_args.destination
         assert(destination != parsed_args.directory)
-    directory = Path(parsed_args.directory)
+    path = Path(parsed_args.directory)
     converter = Converter(parsed_args.action)
     if parsed_args.parent:
-        parsed_args.root = directory.parent
+        parsed_args.root = path.parent
     if parsed_args.root:
         root_dir = Path(parsed_args.root)
         converter.options.root_dir = root_dir
     else:
-        converter.options.root_dir = directory
-    converter.options.root_dir_module_name = parsed_args.name
+        converter.options.root_dir = path
+    converter.options.set_root_dir_module_name(parsed_args.name)
     for include in parsed_args.include:
         log_messages.append(f'include search path: "{include}"')
         converter.options.search_path.append(include)
@@ -129,9 +132,21 @@ def main():
         ext = parsed_args.outextmodimpl
         log_messages.append(f'output module implementation unit extension: "{ext}"')
         converter.options.set_output_content_type_to_ext(ContentType.MODULE_IMPL, ext)
+    for modules_pair in parsed_args.modules:
+        module_prefix, path = modules_pair.split('=')
+        log_messages.append(f'module prefix: "{module_prefix}" in path "{path}"')
+        converter.options.add_modules_path(module_prefix, path)
+    if parsed_args.modulestd:
+        assert(not parsed_args.modulestdcompat)
+        log_messages.append(f'module std: "std"')
+        converter.options.add_std_module()
+    if parsed_args.modulestdcompat:
+        assert(not parsed_args.modulestd)
+        log_messages.append(f'module std.compat: "std.compat"')
+        converter.options.add_std_compat_module()
     log_text = '\n'.join(log_messages)
     log(log_text)
-    converter.convert_directory(directory, Path(destination))
+    converter.convert_directory(path, Path(destination))
     log(log_text)
     log(f'done, all: {converter.all_files}, convertable: {converter.convertable_files}, converted: {converter.converted_files}, copied: {converter.copied_files} ')
 

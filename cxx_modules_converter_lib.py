@@ -33,6 +33,121 @@ always_include_names = [
 COMPAT_MACRO_DEFAULT: str = "CXX_COMPAT_HEADER"
 STAR_MODULE_EXPORT: str = '*'
 
+STD_MODULE = 'std'
+STD_COMPAT_MODULE = 'std.compat'
+
+# Standard library headers, list of files from libstdc++-14-dev
+STD_MODULE_PATHS = [
+    'algorithm',
+    'any',
+    'array',
+    'atomic',
+    'barrier',
+    'bit',
+    'bitset',
+    # 'cassert',
+    'ccomplex',
+    'cctype',
+    'cerrno',
+    'cfenv',
+    'cfloat',
+    'charconv',
+    'chrono',
+    'cinttypes',
+    'ciso646',
+    'climits',
+    'clocale',
+    'cmath',
+    'codecvt',
+    'compare',
+    'complex',
+    'concepts',
+    'condition_variable',
+    'coroutine',
+    'csetjmp',
+    'csignal',
+    'cstdalign',
+    'cstdarg',
+    'cstdbool',
+    'cstddef',
+    'cstdint',
+    'cstdio',
+    'cstdlib',
+    'cstring',
+    'ctgmath',
+    'ctime',
+    'cuchar',
+    'cwchar',
+    'cwctype',
+    'deque',
+    'exception',
+    'execution',
+    'expected',
+    'filesystem',
+    'format',
+    'forward_list',
+    'fstream',
+    'functional',
+    'future',
+    'generator',
+    'initializer_list',
+    'iomanip',
+    'ios',
+    'iosfwd',
+    'iostream',
+    'istream',
+    'iterator',
+    'latch',
+    'limits',
+    'list',
+    'locale',
+    'map',
+    'memory',
+    'memory_resource',
+    'mutex',
+    'new',
+    'numbers',
+    'numeric',
+    'optional',
+    'ostream',
+    'print',
+    'queue',
+    'random',
+    'ranges',
+    'ratio',
+    'regex',
+    'scoped_allocator',
+    'semaphore',
+    'set',
+    'shared_mutex',
+    'source_location',
+    'span',
+    'spanstream',
+    'sstream',
+    'stack',
+    'stacktrace',
+    'stdexcept',
+    'stdfloat',
+    'stop_token',
+    'streambuf',
+    'string',
+    'string_view',
+    'syncstream',
+    'system_error',
+    'text_encoding',
+    'thread',
+    'tuple',
+    'typeindex',
+    'typeinfo',
+    'type_traits',
+    'unordered_map',
+    'unordered_set',
+    'utility',
+    'valarray',
+    'variant',
+    'vector',
+    # 'version',
+]
 class ContentType(enum.Enum):
     HEADER = 1
     CXX = 2
@@ -47,7 +162,7 @@ class Options:
     def __init__(self):
         self.always_include_names = copy.copy(always_include_names)
         self.root_dir: Path = Path()
-        self.root_dir_module_name: str = ''
+        # self.root_dir_module_name: str = ''
         self.search_path: list[str] = []
         self.skip_patterns: list[str] = []
         self.compat_patterns: list[str] = []
@@ -70,6 +185,7 @@ class Options:
             ContentType.MODULE_INTERFACE: '.cppm',
             ContentType.MODULE_IMPL: '.cpp',
         }
+        self.path_to_module_prefix_map: dict[PurePosixPath, str] = {}
 
     def add_export_module(self, owner: str, export: str):
         owner_exports = self.export.setdefault(owner, set())
@@ -105,13 +221,39 @@ class Options:
         assert(ext != '.')
         self.content_type_to_ext[type] = ext
 
+    def add_modules_path(self, module_prefix: str, pathStr: str):
+        path = PurePosixPath(pathStr)
+        if path in self.path_to_module_prefix_map:
+            print(f'warning: path {path} already mapped to module prefix {self.path_to_module_prefix_map[path]}')
+            return
+        self.path_to_module_prefix_map[path] = module_prefix
+
+    def root_dir_module_name(self) -> str:
+        return self.path_to_module_prefix_map.get(PurePosixPath(), '')
+
+    def set_root_dir_module_name(self, prefix: str):
+        self.add_modules_path(prefix, '')
+
+    def add_std_module(self):
+        for path in STD_MODULE_PATHS:
+            self.add_modules_path(STD_MODULE, path)
+
+    def add_std_compat_module(self):
+        for path in STD_MODULE_PATHS:
+            self.add_modules_path(STD_COMPAT_MODULE, path)
+
 class FileOptions:
     def __init__(self):
         self.convert_as_compat: bool = False
 
-def filename_to_module_name(filename: PurePosixPath) -> str:
-    parts = os.path.splitext(filename)
-    result = parts[0].replace('/', '.').replace('\\', '.')
+def filename_to_module_name(filename: PurePosixPath, base_module: str|None) -> str:
+    filenameStr, _ = os.path.splitext(filename)
+    parts = list(PurePosixPath(filenameStr).parts)
+    if base_module:
+        parts.insert(0, base_module)
+    result = '.'.join(parts)
+    if result.startswith('.'):
+        result = result[1:]
     return result
 
 class FileEntryType(enum.Enum):
@@ -154,6 +296,7 @@ class FilesMap:
         self.value.update(other)
 
 ActionExtTypes: TypeAlias = dict[ConvertAction, ExtTypes]
+EmptyPath = PurePosixPath('')
 
 class FilesResolver:
     def __init__(self, options: Options):
@@ -188,10 +331,11 @@ class FilesResolver:
         return None
 
     def convert_filename_to_module_name(self, filename: PurePosixPath) -> str:
-        full_name = filename
-        if self.options.root_dir_module_name and self.files_map.find(filename):
-            full_name = PurePosixPath(self.options.root_dir_module_name).joinpath(filename)
-        module_name = filename_to_module_name(full_name)
+        base_module = None
+        root_dir_module_name = self.options.root_dir_module_name()
+        if root_dir_module_name and self.files_map.find(filename):
+            base_module = root_dir_module_name
+        module_name = filename_to_module_name(filename, base_module)
         return module_name
 
     def get_source_content_type(self, action: ConvertAction, filename: Path) -> ContentType:
@@ -205,6 +349,26 @@ class FilesResolver:
         new_extension = self.options.content_type_to_ext[content_type]
         new_filename = parts[0] + new_extension
         return new_filename
+    
+    def make_defined_module_for_path(self, filename: PurePosixPath) -> str | None:
+        inmodule_path = EmptyPath
+        while True:
+            module_prefix = self.options.path_to_module_prefix_map.get(filename, None)
+            if module_prefix is not None:
+                if module_prefix == EmptyPath:
+                    return self.convert_filename_to_module_name(filename)
+                else:
+                    return filename_to_module_name(inmodule_path, module_prefix)
+            name = PurePosixPath(filename.name)
+            if inmodule_path == EmptyPath:
+                inmodule_path = PurePosixPath(filename_to_module_name(name, ''))
+            else:
+                inmodule_path = name.joinpath(inmodule_path)
+            if filename == EmptyPath:
+                break
+            # go up
+            filename = filename.parent
+        return None
 
 class ModuleFilesResolver:
     def __init__(self, parent_resolver: FilesResolver, options: Options):
@@ -224,7 +388,11 @@ class ModuleFilesResolver:
     def resolve_include_to_module_name(self, include_filename: str, is_quote: bool) -> str | None:
         resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename, is_quote)
         if resolved_include_filename is None:
-            return None
+            result = self.parent_resolver.make_defined_module_for_path(PurePosixPath(include_filename))
+            return result
+        result = self.parent_resolver.make_defined_module_for_path(resolved_include_filename)
+        if result is not None:
+            return result
         result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
         return result
 
@@ -350,7 +518,12 @@ class ModuleBaseBuilder(FileBaseBuilder):
     def set_source_filename(self, source_filename: Path):
         super().set_source_filename(source_filename)
         self.resolver.set_filename(source_filename)
-        self.set_module_name(self.parent_resolver.convert_filename_to_module_name(PurePosixPath(source_filename)))
+        pure_source_filename = PurePosixPath(source_filename)
+        module_name = self.parent_resolver.make_defined_module_for_path(pure_source_filename)
+        if not module_name:
+            module_name = self.parent_resolver.convert_filename_to_module_name(pure_source_filename)
+        assert(module_name)
+        self.set_module_name(module_name)
 
     def set_module_name(self, name: str):
         assert(not self.module_name)

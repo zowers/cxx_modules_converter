@@ -531,7 +531,7 @@ def test_module_include_always_include_names_subdir_root_named():
             'simple.h': FileEntryType.FILE,
         },
     })
-    converter.options.root_dir_module_name = 'org'
+    converter.options.set_root_dir_module_name('org')
     converted = converter.convert_file_content(
 '''#include "options.h"
 ''', 'subdir/simple.h')
@@ -737,7 +737,7 @@ import simple2;
 def test_module_interface_export_suffix_named():
     converter = Converter(ConvertAction.MODULES)
     converter.options.export_suffixes.append('_fwd')
-    converter.options.root_dir_module_name = 'org'
+    converter.options.set_root_dir_module_name('org')
     converter.resolver.files_map.add_files_map_dict({
         'simple.h': FileEntryType.FILE,
         'simple_fwd.h': FileEntryType.FILE,
@@ -763,7 +763,15 @@ def test_resolve_include():
     assert(resolver.module_dir == PurePosixPath('subdir'))
     assert(resolver.resolve_include('simple.h', True) == PurePosixPath('simple.h'))
     assert(resolver.resolve_include('simple.h', False) is None)
-    # make `simple.h` available
+    # make `simple.h` available in subdir
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'simple.h': FileEntryType.FILE,
+        },
+    })
+    assert(resolver.resolve_include('simple.h', True) == PurePosixPath('subdir/simple.h'))
+    assert(resolver.resolve_include('simple.h', False) is None)
+    # make `simple.h` available in root
     resolver.parent_resolver.files_map.add_files_map_dict({
         'simple.h': FileEntryType.FILE,
     })
@@ -804,6 +812,73 @@ def test_resolve_include_to_module_name():
     })
     assert(resolver.resolve_include_to_module_name('simple.h', False) == 'simple')
     assert(resolver.resolve_include_to_module_name('subdir/simple.h', False) == 'subdir.simple')
+
+def test_resolve_include_to_module_name_add_modules_path_subdir():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    assert(resolver.resolve_include_to_module_name('subdir/simple.h', True) == 'subdir.simple')
+    assert(resolver.resolve_include_to_module_name('subdir/simple.h', False) is None)
+    resolver.options.add_modules_path('TestModule', 'subdir')
+    assert(resolver.resolve_include_to_module_name('subdir/simple.h', True) == 'TestModule.simple')
+    assert(resolver.resolve_include_to_module_name('subdir/simple.h', False) == 'TestModule.simple')
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', True) == 'TestModule.subdir2.simple')
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', False) == 'TestModule.subdir2.simple')
+
+def test_resolve_include_to_module_name_add_modules_path_subdir_level2():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', True) == 'subdir.subdir2.simple')
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', False) is None)
+    resolver.options.add_modules_path('TestModule', 'subdir/subdir2')
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', True) == 'TestModule.simple')
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', False) == 'TestModule.simple')
+
+def test_resolve_include_to_module_name_add_modules_path_subdir_level2_in_subdir():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('subdir/simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    # make `simple.h` available in subdir
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'subdir2': {
+                'simple.h': FileEntryType.FILE,
+            },
+        },
+    })
+    assert(resolver.resolve_include_to_module_name('subdir2/simple.h', True) == 'subdir.subdir2.simple')
+    assert(resolver.resolve_include_to_module_name('subdir2/simple.h', False) is None)
+    resolver.options.add_modules_path('TestModule', 'subdir/subdir2')
+    assert(resolver.resolve_include_to_module_name('subdir2/simple.h', True) == 'TestModule.simple')
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', True) == 'TestModule.simple')
+    assert(resolver.resolve_include_to_module_name('subdir2/simple.h', False) == None)
+    assert(resolver.resolve_include_to_module_name('subdir/subdir2/simple.h', False) == 'TestModule.simple')
+
+def test_resolve_include_to_module_name_std():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    assert(resolver.resolve_include_to_module_name('vector', False) is None)
+    resolver.options.add_std_module()
+    assert(resolver.resolve_include_to_module_name('vector', False) == 'std')
+
+def test_resolve_include_to_module_name_std_compat():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    assert(resolver.resolve_include_to_module_name('vector', False) is None)
+    resolver.options.add_std_compat_module()
+    assert(resolver.resolve_include_to_module_name('vector', False) == 'std.compat')
+
+def test_resolve_include_to_module_name_std_w_root_name():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    assert(resolver.resolve_include_to_module_name('vector', False) is None)
+    resolver.options.add_std_module()
+    resolver.options.set_root_dir_module_name('TestModule')
+    assert(resolver.resolve_include_to_module_name('vector', False) == 'std')
 
 def test_resolver_convert_filename_to_module_name():
     converter = Converter(ConvertAction.MODULES)
@@ -933,7 +1008,7 @@ def test_FilesResolver_convert_filename_to_module_name():
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('root.h')) == 'root')
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('subdir1/simple1.h')) == 'subdir1.simple1')
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('missing.h')) == 'missing')
-    options.root_dir_module_name = 'org'
+    options.set_root_dir_module_name('org')
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('root.h')) == 'org.root')
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('subdir1/simple1.h')) == 'org.subdir1.simple1')
     assert(files_resolver.convert_filename_to_module_name(PurePosixPath('missing.h')) == 'missing')
@@ -1299,7 +1374,7 @@ def test_dir_simple(dir_simple: Path):
 def test_dir_named1(dir_simple: Path):
     data_directory = Path('test_data/named1')
     converter = Converter(ConvertAction.MODULES)
-    converter.options.root_dir_module_name = 'org'
+    converter.options.set_root_dir_module_name('org')
     converter.convert_directory(data_directory.joinpath('input'), dir_simple)
     # convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
@@ -1323,12 +1398,29 @@ def test_dir_prefix_named(dir_simple: Path):
     converter = Converter(ConvertAction.MODULES)
     input_dir = data_directory.joinpath('input')
     converter.options.root_dir = input_dir
-    converter.options.root_dir_module_name = 'org'
+    converter.options.set_root_dir_module_name('org')
     converter.convert_directory(input_dir.joinpath('subdir'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'subdir/local_include.cppm',
         'subdir/simple.cppm',
         'subdir/simple.cpp',
+    ])
+
+def test_dir_modules_path(dir_simple: Path):
+    data_directory = Path('test_data/modules_path')
+    converter = Converter(ConvertAction.MODULES)
+    input_dir = data_directory.joinpath('input')
+    converter.options.root_dir = input_dir
+    converter.options.add_modules_path('org', '') # same as `.set_root_dir_module_name('org')`
+    converter.options.add_modules_path('org2', 'dir2')
+    converter.convert_directory(input_dir, dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'subdir/local_include.cppm',
+        'subdir/simple.cppm',
+        'subdir/simple.cpp',
+        'dir2/local_include.cppm',
+        'dir2/simple.cppm',
+        'dir2/simple.cpp',
     ])
 
 def test_dir_compat(dir_simple: Path):
