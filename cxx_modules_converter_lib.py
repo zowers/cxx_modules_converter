@@ -355,7 +355,7 @@ class FilesResolver:
         while True:
             module_prefix = self.options.path_to_module_prefix_map.get(filename, None)
             if module_prefix is not None:
-                if module_prefix == EmptyPath:
+                if filename == EmptyPath:
                     return self.convert_filename_to_module_name(filename)
                 else:
                     return filename_to_module_name(inmodule_path, module_prefix)
@@ -364,10 +364,10 @@ class FilesResolver:
                 inmodule_path = PurePosixPath(filename_to_module_name(name, ''))
             else:
                 inmodule_path = name.joinpath(inmodule_path)
-            if filename == EmptyPath:
-                break
             # go up
             filename = filename.parent
+            if filename == EmptyPath:
+                break
         return None
 
 class ModuleFilesResolver:
@@ -716,10 +716,10 @@ class ModuleBaseBuilder(FileBaseBuilder):
         line_tail = match[4]
 
         resolved_include_filename = self.resolver.resolve_include(line_include_filename, is_quote)
-        if resolved_include_filename is None:
+        if resolved_include_filename is None and is_quote:
             self.add_global_module_fragment(line)
             return
-        if any_pattern_maches(self.options.always_include_names, resolved_include_filename):
+        if any_pattern_maches(self.options.always_include_names, resolved_include_filename or PurePosixPath(line_include_filename)):
             self.add_global_module_fragment(line)
             return
         

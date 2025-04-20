@@ -1371,6 +1371,16 @@ def test_dir_simple(dir_simple: Path):
         'simple.cpp',
     ])
 
+def test_dir_simple_std(dir_simple: Path):
+    data_directory = Path('test_data/simple_std')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_std_module()
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.cppm',
+        'simple.cpp',
+    ])
+
 def test_dir_named1(dir_simple: Path):
     data_directory = Path('test_data/named1')
     converter = Converter(ConvertAction.MODULES)

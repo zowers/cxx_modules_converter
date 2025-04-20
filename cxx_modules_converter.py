@@ -62,8 +62,8 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('--outextmod', help=f'output module interface unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_INTERFACE]}')
     parser.add_argument('--outextmodimpl', help=f'output module implementation unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_IMPL]}')
     parser.add_argument('--modules', action='append', default=[], help='`M=P`: start modules tree `M` at path `P`, directory separator is converted to `.` (dot). Default: use directory name and file name as module name.')
-    parser.add_argument('--modulestd', default=False, help='Enable `std` module, i.e. define `--modules vector=std` to replace `vector` and other standard headers to `import std;`.')
-    parser.add_argument('--modulestdcompat', default=False, help='Enable `std.compat` module, i.e. define `--modules vector=std.compat` to replace `vector` and other standard headers to `import std.compat;`.')
+    parser.add_argument('--modulestd', default=False, action='store_true', help='Enable `std` module, i.e. define `--modules vector=std` to replace `vector` and other standard headers to `import std;`.')
+    parser.add_argument('--modulestdcompat', default=False, action='store_true', help='Enable `std.compat` module, i.e. define `--modules vector=std.compat` to replace `vector` and other standard headers to `import std.compat;`.')
     parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
     return parsed_args
