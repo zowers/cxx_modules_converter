@@ -1,13 +1,13 @@
 [project]
 name = "cxx-modules-converter"
-version = "0.1.15"
+version = "0.1.16"
 description = "Convert C++20 modules to headers and headers to modules"
 authors = [
     {name = "Alexander Petrov", email = "zowers@zowers.net"}
 ]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
 
 [project.scripts]

@@ -2,7 +2,6 @@
 #
 # Convert C++20 modules to headers and headers to modules
 #
-from __future__ import annotations
 
 import argparse
 import importlib.metadata

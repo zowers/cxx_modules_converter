@@ -6,6 +6,9 @@
 
 cxx_modules_converter is licensed under the [MIT](LICENSE) license.
 
+## Requirements
+Python 3.10 or later is required.
+
 ## Usage
 Script can be used as following:
 > cxx_modules_converter.py [-h] [-s DIRECTORY] [-d DESTINATION] [-a {modules,headers}] [-r ROOT] [-p] [-I INCLUDE] [-n NAME] [-k SKIP] [-c COMPAT] [-m COMPAT_MACRO] [-e HEADER] [--export EXPORT] [--exportsuffix EXPORTSUFFIX] [-v]
@@ -67,4 +70,20 @@ source .venv/bin/activate
 Install pytest requirements using
 ```bash
 pip install -r requirements-test.txt
+```
+
+## Development
+
+For development, you need to install Poetry:
+
+```bash
+pip install poetry
+```
+
+To bump the version, use:
+
+```bash
+poetry version patch  # for patch version
+poetry version minor  # for minor version
+poetry version major  # for major version
 ```
