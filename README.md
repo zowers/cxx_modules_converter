@@ -52,14 +52,14 @@ Script can be used as following:
 * -v, --version         show version
 
 ## Assumptions
-The converter has several assumptions which are not configurable (at the moment):
-* following source files extensions are used:
-  * `.h` - header file
-  * `.cpp` - c++ source file
-  * `.cpp` - module implementation unit
-  * `.cppm` - module interface unit
-* header file path is used to determine module name by joining path parts with dots (`.`); same for c++ source files
-* system header includes using `#include <>` are moved to global module fragment
+The converter has several configurable assumptions:
+* following source files extensions are used by default but can be changed:
+  * `.h` - header file (input), configurable with `--inextheader`
+  * `.cpp` - c++ source file (input), configurable with `--inextcxx`
+  * `.cpp` - module implementation unit (output), configurable with `--outextmodimpl`
+  * `.cppm` - module interface unit (output), configurable with `--outextmod`
+* header file path is used to determine module name by joining path parts with dots (`.`); same for c++ source files, but can be customized using `--join` option to combine multiple files into module partitions
+* system header includes using `#include <>` are moved to global module fragment, but standard library headers can be replaced with `import std;` using `--modulestd` or `import std.compat;` using `--modulestdcompat`
 
 ## Tests
 [`pytest`](https://pytest.org/) is used to run tests.
