@@ -246,24 +246,6 @@ class Options:
 class FileOptions:
     def __init__(self):
         self.convert_as_compat: bool = False
-def get_module_name_for_import(module_name: str, use_full_name: bool = False, current_module_name: str | None = None) -> str:
-    if use_full_name:
-        return module_name
-    
-    module_parts = module_name.split(':', 1)
-    external_module_name = module_parts[0]
-    
-    if current_module_name and len(module_parts) > 1:
-        partition_name = module_parts[1]
-        
-        current_module_parts = current_module_name.split(':', 1)
-        current_external_module_name = current_module_parts[0]
-        
-        if external_module_name == current_external_module_name:
-            return ':' + partition_name
-    
-    return external_module_name
-
 class FileEntryType(enum.IntEnum):
     FILE = 1
     DIR = 2
@@ -437,13 +419,29 @@ class ModuleFilesResolver:
         resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename, is_quote)
         if resolved_include_filename is None:
             result = self.parent_resolver.make_defined_module_for_path(PurePosixPath(include_filename))
-            return get_module_name_for_import(result, use_full_name, self.module_name) if result else result
+            return self.get_module_name_for_import(result, use_full_name) if result else result
         result = self.parent_resolver.make_defined_module_for_path(resolved_include_filename)
         if result is not None:
-            return get_module_name_for_import(result, use_full_name, self.module_name)
+            return self.get_module_name_for_import(result, use_full_name)
         result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
-        return get_module_name_for_import(result, use_full_name, self.module_name)
-
+        return self.get_module_name_for_import(result, use_full_name)
+    def get_module_name_for_import(self, module_name: str, use_full_name: bool) -> str:
+        if use_full_name:
+            return module_name
+        
+        module_parts = module_name.split(':', 1)
+        external_module_name = module_parts[0]
+        
+        if self.module_name and len(module_parts) > 1:
+            partition_name = module_parts[1]
+            
+            current_module_parts = self.module_name.split(':', 1)
+            current_external_module_name = current_module_parts[0]
+            
+            if external_module_name == current_external_module_name:
+                return ':' + partition_name
+        
+        return external_module_name
 ContentTypeToName: TypeAlias = dict[ContentType, str]
 content_type_to_name: ContentTypeToName = {
     ContentType.HEADER: 'header',
