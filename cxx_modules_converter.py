@@ -63,6 +63,9 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('--modules', action='append', default=[], help='`M=P`: start modules tree `M` at path `P`, directory separator is converted to `.` (dot). Default: use directory name and file name as module name.')
     parser.add_argument('--modulestd', default=False, action='store_true', help='Enable `std` module, i.e. define `--modules vector=std` to replace `vector` and other standard headers to `import std;`.')
     parser.add_argument('--modulestdcompat', default=False, action='store_true', help='Enable `std.compat` module, i.e. define `--modules vector=std.compat` to replace `vector` and other standard headers to `import std.compat;`.')
+    parser.add_argument('--join', action='append', default=[],
+                        help='A=B means create module A with partition modules for files matching pattern B. '
+                             'Example: --join A=A/* creates module A with partitions for all files in A/ directory.')
     parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
     return parsed_args
@@ -143,6 +146,10 @@ def main():
         assert(not parsed_args.modulestd)
         log_messages.append(f'module std.compat: "std.compat"')
         converter.options.add_std_compat_module()
+    for join_pair in parsed_args.join:
+        target_module, pattern = join_pair.split('=', 1)
+        log_messages.append(f'join: "{target_module}" from pattern "{pattern}"')
+        converter.options.add_join_configuration(target_module, pattern)
     log_text = '\n'.join(log_messages)
     log(log_text)
     converter.convert_directory(path, Path(destination))

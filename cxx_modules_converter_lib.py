@@ -180,6 +180,7 @@ class Options:
             ContentType.MODULE_IMPL: '.cpp',
         }
         self.path_to_module_prefix_map: dict[PurePosixPath, str] = {}
+        self.join_configurations: dict[str, str] = {} # pattern -> target_module
 
     def add_export_module(self, owner: str, export: str):
         owner_exports = self.export.setdefault(owner, set())
@@ -235,12 +236,45 @@ class Options:
     def add_std_compat_module(self):
         for path in STD_MODULE_PATHS:
             self.add_modules_path(STD_COMPAT_MODULE, path)
+    
+    def add_join_configuration(self, target_module: str, pattern: str):
+        if pattern in self.join_configurations:
+            print(f'warning: pattern "{pattern}" already mapped to target module "{self.join_configurations[pattern]}"')
+            return
+        self.join_configurations[pattern] = target_module
 
 class FileOptions:
     def __init__(self):
         self.convert_as_compat: bool = False
 
-def filename_to_module_name(filename: PurePosixPath, base_module: str|None) -> str:
+def filename_to_module_name(filename: PurePosixPath, base_module: str|None, join_configurations: dict[str, str]|None) -> str:
+    matched_target_module = None
+    matched_pattern_dir = None
+    if join_configurations:
+        for pattern, target_module in join_configurations.items():
+            if fnmatch.fnmatchcase(filename.as_posix(), pattern):
+                is_star_pattern = pattern == '*'
+                is_slash_star_pattern = pattern.endswith('/*')
+                
+                if is_star_pattern or is_slash_star_pattern:
+                    if is_star_pattern:
+                        pattern_dir = ''
+                    else:
+                        pattern_dir = pattern[:-2]
+                    
+                    if is_star_pattern or filename.as_posix().startswith(pattern_dir + '/'):
+                        matched_target_module = target_module
+                        matched_pattern_dir = pattern_dir
+                        break
+    
+    if matched_target_module is not None and matched_pattern_dir is not None:
+        remaining_path = filename.as_posix()[len(matched_pattern_dir):]
+        if remaining_path.startswith('/'):
+            remaining_path = remaining_path[1:]
+        remaining_path = remaining_path.split('.')[0]
+        remaining_path = remaining_path.replace('/', '.')
+        return f"{matched_target_module}:{remaining_path}"
+    
     filenameStr, _ = os.path.splitext(filename)
     parts = list(PurePosixPath(filenameStr).parts)
     if base_module:
@@ -249,6 +283,24 @@ def filename_to_module_name(filename: PurePosixPath, base_module: str|None) -> s
     if result.startswith('.'):
         result = result[1:]
     return result
+
+def get_module_name_for_import(module_name: str, use_full_name: bool = False, current_module_name: str | None = None) -> str:
+    if use_full_name:
+        return module_name
+    
+    module_parts = module_name.split(':', 1)
+    external_module_name = module_parts[0]
+    
+    if current_module_name and len(module_parts) > 1:
+        partition_name = module_parts[1]
+        
+        current_module_parts = current_module_name.split(':', 1)
+        current_external_module_name = current_module_parts[0]
+        
+        if external_module_name == current_external_module_name:
+            return ':' + partition_name
+    
+    return external_module_name
 
 class FileEntryType(enum.IntEnum):
     FILE = 1
@@ -329,7 +381,7 @@ class FilesResolver:
         root_dir_module_name = self.options.root_dir_module_name()
         if root_dir_module_name and self.files_map.find(filename):
             base_module = root_dir_module_name
-        module_name = filename_to_module_name(filename, base_module)
+        module_name = filename_to_module_name(filename, base_module, self.options.join_configurations)
         return module_name
 
     def get_source_content_type(self, action: ConvertAction, filename: Path) -> ContentType:
@@ -352,10 +404,10 @@ class FilesResolver:
                 if filename == EmptyPath:
                     return self.convert_filename_to_module_name(filename)
                 else:
-                    return filename_to_module_name(inmodule_path, module_prefix)
+                    return filename_to_module_name(inmodule_path, module_prefix, None)
             name = PurePosixPath(filename.name)
             if inmodule_path == EmptyPath:
-                inmodule_path = PurePosixPath(filename_to_module_name(name, ''))
+                inmodule_path = PurePosixPath(filename_to_module_name(name, '', None))
             else:
                 inmodule_path = name.joinpath(inmodule_path)
             # go up
@@ -370,6 +422,10 @@ class ModuleFilesResolver:
         self.options: Options = options
         self.module_filename: Path = Path()
         self.module_dir: Path = Path()
+        self.module_name: str | None = None
+
+    def set_module_name(self, name: str):
+        self.module_name = name
 
     def set_filename(self, filename: Path):
         self.module_filename = filename
@@ -379,16 +435,16 @@ class ModuleFilesResolver:
         result = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename, is_quote)
         return result
 
-    def resolve_include_to_module_name(self, include_filename: str, is_quote: bool) -> str | None:
+    def resolve_include_to_module_name(self, include_filename: str, is_quote: bool, use_full_name: bool = False) -> str | None:
         resolved_include_filename = self.parent_resolver.resolve_in_search_path(self.module_dir, self.module_filename, include_filename, is_quote)
         if resolved_include_filename is None:
             result = self.parent_resolver.make_defined_module_for_path(PurePosixPath(include_filename))
-            return result
+            return get_module_name_for_import(result, use_full_name, self.module_name) if result else result
         result = self.parent_resolver.make_defined_module_for_path(resolved_include_filename)
         if result is not None:
-            return result
+            return get_module_name_for_import(result, use_full_name, self.module_name)
         result = self.parent_resolver.convert_filename_to_module_name(resolved_include_filename)
-        return result
+        return get_module_name_for_import(result, use_full_name, self.module_name)
 
 ContentTypeToName: TypeAlias = dict[ContentType, str]
 content_type_to_name: ContentTypeToName = {
@@ -522,6 +578,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
     def set_module_name(self, name: str):
         assert(not self.module_name)
         self.module_name = name
+        self.resolver.set_module_name(name)
 
     def set_is_actually_module(self) -> None:
         if self.global_module_fragment:
@@ -717,11 +774,12 @@ class ModuleBaseBuilder(FileBaseBuilder):
             self.add_global_module_fragment(line)
             return
         
-        line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename, is_quote)
+        line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename, is_quote, False)
         if line_module_name is None:
             self.add_global_module_fragment(line)
             return
-        if line_module_name == self.module_name:
+        full_line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename, is_quote, True)
+        if full_line_module_name == self.module_name:
             self.set_is_actually_module()
             self.set_module_purview_start()
             return
@@ -1060,6 +1118,45 @@ class Converter:
         else:
             self.add_filesystem_directory(source_directory)
             self.convert_directory_impl(source_directory, destination_directory, Path(), FileOptions())
+
+        self.create_joined_module_files(destination_directory)
+
+    def create_joined_module_files(self, destination_directory: Path):
+        for pattern, target_module in self.options.join_configurations.items():
+            partition_modules: list[str] = []
+            if pattern == '*':
+                partition_modules = list(self.module_interface_builders.keys())
+            else:
+                for module_name in self.module_interface_builders.keys():
+                    if module_name.startswith(f"{target_module}:"):
+                        partition_modules.append(module_name)
+
+            if partition_modules:
+                module_content_lines: list[str] = [
+                    f'''export module {target_module};''',
+                    '',
+                ]
+
+                partition_names: list[str] = []
+                for partition_module in partition_modules:
+                    if ':' in partition_module:
+                        partition_name = partition_module.split(':', 1)[1]
+                        partition_names.append(f":{partition_name}")
+                    else:
+                        # handle modules without colon (should not happen in this context)
+                        partition_names.append(partition_module)
+
+                partition_names.sort()
+
+                for partition_name in partition_names:
+                    module_content_lines.append(f'''export import {partition_name};''')
+
+                module_content = "\n".join(module_content_lines) + "\n"
+
+                output_filename = f"{target_module}{self.options.content_type_to_ext[ContentType.MODULE_INTERFACE]}"
+                output_path = destination_directory / output_filename
+
+                self._create_or_update_file_content_if_diff(output_path, module_content)
 
     def add_filesystem_directory(self, directory: Path):
         print('adding filesystem directory', directory)

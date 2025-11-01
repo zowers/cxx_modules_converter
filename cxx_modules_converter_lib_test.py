@@ -15,6 +15,7 @@ from cxx_modules_converter_lib import (
     FilesResolver,
     ModuleFilesResolver,
     FileContent,
+    filename_to_module_name,
     )
 
 def test_module_empty():
@@ -1624,3 +1625,167 @@ def test_dir_outext(dir_simple: Path):
         'simple.cxx',
         'simple2.hpp',
     ])
+
+def test_add_join_configuration():
+    options = Options()
+    options.add_join_configuration('mymodule', 'subdir/*')
+    assert(options.join_configurations == {'subdir/*': 'mymodule'})
+
+def test_add_join_configuration_star():
+    options = Options()
+    options.add_join_configuration('mymodule', '*')
+    assert(options.join_configurations == {'*': 'mymodule'})
+
+    result = filename_to_module_name(PurePosixPath('test.h'), None, options.join_configurations)
+    assert(result == 'mymodule:test')
+
+    result = filename_to_module_name(PurePosixPath('subdir/test.h'), None, options.join_configurations)
+    assert(result == 'mymodule:subdir.test')
+
+def test_filename_to_module_name_with_join_configuration():
+    result = filename_to_module_name(PurePosixPath('subdir/test.h'), None, None)
+    assert(result == 'subdir.test')
+
+    join_configurations = {'subdir/*': 'mymodule'}
+    result = filename_to_module_name(PurePosixPath('subdir/test.h'), None, join_configurations)
+    assert(result == 'mymodule:test')
+
+    result = filename_to_module_name(PurePosixPath('other/test.h'), None, join_configurations)
+    assert(result == 'other.test')
+
+def test_set_root_dir_module_name_and_add_join_configuration():
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.set_root_dir_module_name('org')
+    converter.options.add_join_configuration('org.mymodule', 'subdir/*')
+    converter.resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'test.h': FileEntryType.FILE,
+        },
+        'other': {
+            'test.h': FileEntryType.FILE,
+        },
+    })
+    
+    result1 = converter.resolver.convert_filename_to_module_name(PurePosixPath('subdir/test.h'))
+    assert(result1 == 'org.mymodule:test')
+    
+    result2 = converter.resolver.convert_filename_to_module_name(PurePosixPath('other/test.h'))
+    assert(result2 == 'org.other.test')
+
+def test_dir_partitions(dir_simple: Path):
+    data_directory = Path('test_data/partitions')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_join_configuration('mymodule', '*')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'part1.cppm',
+        'part2.cppm',
+        'subdir/part3.cppm',
+        'mymodule.cppm',
+    ])
+
+def test_dir_partitions_local_import(dir_simple: Path):
+    data_directory = Path('test_data/partitions_local_import')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_join_configuration('mymodule', '*')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'part1.cppm',
+        'part2.cppm',
+        'subdir/part3.cppm',
+        'mymodule.cppm',
+    ])
+
+def test_dir_custom_join_configurations(dir_simple: Path):
+    data_directory = Path('test_data/custom_join_test')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_join_configuration('mymodule1', 'subdir1/*')
+    converter.options.add_join_configuration('mymodule2', 'subdir2/*')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'subdir1/simple.cppm',
+        'subdir2/simple.cpp',
+        'subdir2/simple.cppm',
+        'mymodule1.cppm',
+        'mymodule2.cppm',
+    ])
+
+def test_resolve_include_to_module_name_use_full_name_true():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    resolver.set_module_name('test_module')
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'simple.h': FileEntryType.FILE,
+    })
+    assert(resolver.resolve_include_to_module_name('simple.h', False, True) == 'simple')
+
+def test_resolve_include_to_module_name_use_full_name_false_same_external_module():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    resolver.set_module_name('mymodule:partition1')
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'simple.h': FileEntryType.FILE,
+    })
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'simple2.h': FileEntryType.FILE,
+        }
+    })
+    resolver.options.add_join_configuration('mymodule', 'subdir/*')
+    assert(resolver.resolve_include_to_module_name('subdir/simple2.h', False, False) == ':simple2')
+
+def test_resolve_include_to_module_name_use_full_name_false_different_external_module():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    resolver.set_module_name('mymodule:partition1')
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'simple.h': FileEntryType.FILE,
+    })
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'otherdir': {
+            'simple2.h': FileEntryType.FILE,
+        }
+    })
+    resolver.options.add_join_configuration('othermodule', 'otherdir/*')
+    assert(resolver.resolve_include_to_module_name('otherdir/simple2.h', False, False) == 'othermodule')
+
+def test_resolve_include_to_module_name_use_full_name_false_no_partition():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    resolver.set_module_name('mymodule')
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'subdir': {
+            'simple.h': FileEntryType.FILE,
+        }
+    })
+    resolver.options.add_join_configuration('mymodule', 'subdir/*')
+    assert(resolver.resolve_include_to_module_name('subdir/simple.h', False, False) == ':simple')
+
+def test_resolve_include_to_module_name_use_full_name_false_no_current_module():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    resolver.parent_resolver.files_map.add_files_map_dict({
+        'simple.h': FileEntryType.FILE,
+    })
+    assert(resolver.resolve_include_to_module_name('simple.h', False, False) == 'simple')
+
+def test_resolve_include_to_module_name_use_full_name_false_std_module():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    resolver.set_module_name('mymodule:partition1')
+    resolver.options.add_std_module()
+    assert(resolver.resolve_include_to_module_name('vector', False, False) == 'std')
+
+def test_resolve_include_to_module_name_use_full_name_false_std_compat_module():
+    converter = Converter(ConvertAction.MODULES)
+    builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
+    resolver = builder.resolver
+    resolver.set_module_name('mymodule:partition1')
+    resolver.options.add_std_compat_module()
+    assert(resolver.resolve_include_to_module_name('vector', False, False) == 'std.compat')
