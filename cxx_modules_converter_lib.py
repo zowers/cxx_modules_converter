@@ -246,44 +246,6 @@ class Options:
 class FileOptions:
     def __init__(self):
         self.convert_as_compat: bool = False
-
-def filename_to_module_name(filename: PurePosixPath, base_module: str|None, join_configurations: dict[str, str]|None) -> str:
-    matched_target_module = None
-    matched_pattern_dir = None
-    if join_configurations:
-        for pattern, target_module in join_configurations.items():
-            if fnmatch.fnmatchcase(filename.as_posix(), pattern):
-                is_star_pattern = pattern == '*'
-                is_slash_star_pattern = pattern.endswith('/*')
-                
-                if is_star_pattern or is_slash_star_pattern:
-                    if is_star_pattern:
-                        pattern_dir = ''
-                    else:
-                        pattern_dir = pattern[:-2]
-                    
-                    if is_star_pattern or filename.as_posix().startswith(pattern_dir + '/'):
-                        matched_target_module = target_module
-                        matched_pattern_dir = pattern_dir
-                        break
-    
-    if matched_target_module is not None and matched_pattern_dir is not None:
-        remaining_path = filename.as_posix()[len(matched_pattern_dir):]
-        if remaining_path.startswith('/'):
-            remaining_path = remaining_path[1:]
-        remaining_path = remaining_path.split('.')[0]
-        remaining_path = remaining_path.replace('/', '.')
-        return f"{matched_target_module}:{remaining_path}"
-    
-    filenameStr, _ = os.path.splitext(filename)
-    parts = list(PurePosixPath(filenameStr).parts)
-    if base_module:
-        parts.insert(0, base_module)
-    result = '.'.join(parts)
-    if result.startswith('.'):
-        result = result[1:]
-    return result
-
 def get_module_name_for_import(module_name: str, use_full_name: bool = False, current_module_name: str | None = None) -> str:
     if use_full_name:
         return module_name
@@ -381,8 +343,44 @@ class FilesResolver:
         root_dir_module_name = self.options.root_dir_module_name()
         if root_dir_module_name and self.files_map.find(filename):
             base_module = root_dir_module_name
-        module_name = filename_to_module_name(filename, base_module, self.options.join_configurations)
+        module_name = self.filename_to_module_name(filename, base_module)
         return module_name
+
+    def filename_to_module_name(self, filename: PurePosixPath, base_module: str|None) -> str:
+        matched_target_module = None
+        matched_pattern_dir = None
+        for pattern, target_module in self.options.join_configurations.items():
+            if fnmatch.fnmatchcase(filename.as_posix(), pattern):
+                is_star_pattern = pattern == '*'
+                is_slash_star_pattern = pattern.endswith('/*')
+                
+                if is_star_pattern or is_slash_star_pattern:
+                    if is_star_pattern:
+                        pattern_dir = ''
+                    else:
+                        pattern_dir = pattern[:-2]
+                    
+                    if is_star_pattern or filename.as_posix().startswith(pattern_dir + '/'):
+                        matched_target_module = target_module
+                        matched_pattern_dir = pattern_dir
+                        break
+        
+        if matched_target_module is not None and matched_pattern_dir is not None:
+            remaining_path = filename.as_posix()[len(matched_pattern_dir):]
+            if remaining_path.startswith('/'):
+                remaining_path = remaining_path[1:]
+            remaining_path = remaining_path.split('.')[0]
+            remaining_path = remaining_path.replace('/', '.')
+            return f"{matched_target_module}:{remaining_path}"
+        
+        filenameStr, _ = os.path.splitext(filename)
+        parts = list(PurePosixPath(filenameStr).parts)
+        if base_module:
+            parts.insert(0, base_module)
+        result = '.'.join(parts)
+        if result.startswith('.'):
+            result = result[1:]
+        return result
 
     def get_source_content_type(self, action: ConvertAction, filename: Path) -> ContentType:
         parts = os.path.splitext(filename)
@@ -404,10 +402,10 @@ class FilesResolver:
                 if filename == EmptyPath:
                     return self.convert_filename_to_module_name(filename)
                 else:
-                    return filename_to_module_name(inmodule_path, module_prefix, None)
+                    return self.filename_to_module_name(inmodule_path, module_prefix)
             name = PurePosixPath(filename.name)
             if inmodule_path == EmptyPath:
-                inmodule_path = PurePosixPath(filename_to_module_name(name, '', None))
+                inmodule_path = PurePosixPath(self.filename_to_module_name(name, ''))
             else:
                 inmodule_path = name.joinpath(inmodule_path)
             # go up

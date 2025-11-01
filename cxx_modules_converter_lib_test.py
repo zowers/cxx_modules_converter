@@ -15,7 +15,6 @@ from cxx_modules_converter_lib import (
     FilesResolver,
     ModuleFilesResolver,
     FileContent,
-    filename_to_module_name,
     )
 
 def test_module_empty():
@@ -1636,21 +1635,25 @@ def test_add_join_configuration_star():
     options.add_join_configuration('mymodule', '*')
     assert(options.join_configurations == {'*': 'mymodule'})
 
-    result = filename_to_module_name(PurePosixPath('test.h'), None, options.join_configurations)
+    files_resolver = FilesResolver(options)
+    result = files_resolver.filename_to_module_name(PurePosixPath('test.h'), None)
     assert(result == 'mymodule:test')
 
-    result = filename_to_module_name(PurePosixPath('subdir/test.h'), None, options.join_configurations)
+    result = files_resolver.filename_to_module_name(PurePosixPath('subdir/test.h'), None)
     assert(result == 'mymodule:subdir.test')
 
 def test_filename_to_module_name_with_join_configuration():
-    result = filename_to_module_name(PurePosixPath('subdir/test.h'), None, None)
+    options = Options()
+    files_resolver = FilesResolver(options)
+    result = files_resolver.filename_to_module_name(PurePosixPath('subdir/test.h'), None)
     assert(result == 'subdir.test')
 
-    join_configurations = {'subdir/*': 'mymodule'}
-    result = filename_to_module_name(PurePosixPath('subdir/test.h'), None, join_configurations)
+    options.join_configurations = {'subdir/*': 'mymodule'}
+    files_resolver = FilesResolver(options)
+    result = files_resolver.filename_to_module_name(PurePosixPath('subdir/test.h'), None)
     assert(result == 'mymodule:test')
 
-    result = filename_to_module_name(PurePosixPath('other/test.h'), None, join_configurations)
+    result = files_resolver.filename_to_module_name(PurePosixPath('other/test.h'), None)
     assert(result == 'other.test')
 
 def test_set_root_dir_module_name_and_add_join_configuration():
