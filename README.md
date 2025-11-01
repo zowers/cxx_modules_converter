@@ -11,7 +11,7 @@ Python 3.10 or later is required.
 
 ## Usage
 Script can be used as following:
-> cxx_modules_converter.py [-h] [-s DIRECTORY] [-d DESTINATION] [-a {modules,headers}] [-r ROOT] [-p] [-I INCLUDE] [-n NAME] [-k SKIP] [-c COMPAT] [-m COMPAT_MACRO] [-e HEADER] [--export EXPORT] [--exportsuffix EXPORTSUFFIX] [-v]
+> cxx_modules_converter.py [-h] [-s DIRECTORY] [-d DESTINATION] [-a {modules,headers}] [-r ROOT] [-p] [-I INCLUDE] [-n NAME] [-k SKIP] [-c COMPAT] [-m COMPAT_MACRO] [-e HEADER] [--export EXPORT] [--exportsuffix EXPORTSUFFIX] [--join JOIN] [-v]
 
 ### Options:
 * -h, --help            show this help message and exit
@@ -48,6 +48,7 @@ Script can be used as following:
                         Enable `std` module, i.e. define `--modules vector=std` to replace `vector` and other standard headers to `import std;`.
 * --modulestdcompat MODULESTDCOMPAT
                         Enable `std.compat` module, i.e. define `--modules vector=std.compat` to replace `vector` and other standard headers to `import std.compat;`.
+* --join JOIN          A=B means create module A with partition modules for files matching pattern B. Example: --join A=A/* creates module A with partitions for all files in A/ directory.
 * -v, --version         show version
 
 ## Assumptions
