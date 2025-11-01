@@ -11,7 +11,7 @@ Python 3.10 or later is required.
 
 ## Usage
 Script can be used as following:
-> cxx_modules_converter.py [-h] [-s DIRECTORY] [-d DESTINATION] [-a {modules,headers}] [-r ROOT] [-p] [-I INCLUDE] [-n NAME] [-k SKIP] [-c COMPAT] [-m COMPAT_MACRO] [-e HEADER] [--export EXPORT] [--exportsuffix EXPORTSUFFIX] [--join JOIN] [-v]
+> cxx_modules_converter.py [-h] [-s DIRECTORY] [-i] [-d DESTINATION] [-a {modules,headers}] [-r ROOT] [-p] [-I INCLUDE] [-n NAME] [-k SKIP] [-c COMPAT] [-m COMPAT_MACRO] [-e HEADER] [--export EXPORT] [--exportsuffix EXPORTSUFFIX] [--inextheader INEXTHEADER] [--inextcxx INEXTCXX] [--outextmod OUTEXTMOD] [--outextmodimpl OUTEXTMODIMPL] [--modules MODULES] [--modulestd] [--modulestdcompat] [--join JOIN] [-v]
 
 ### Options:
 * -h, --help            show this help message and exit
