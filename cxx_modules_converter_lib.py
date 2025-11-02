@@ -572,7 +572,6 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.set_module_name(module_name)
 
     def set_module_name(self, name: str):
-        assert(not self.module_name)
         self.module_name = name
         self.resolver.set_module_name(name)
 
@@ -833,25 +832,29 @@ class ModuleBaseBuilder(FileBaseBuilder):
 class ModuleInterfaceUnitBuilder(ModuleBaseBuilder):
     content_type = ContentType.MODULE_INTERFACE
     '''
-// Module interface unit.
+    // Module interface unit.
 
-// File copyright
+    // File copyright
 
-module;                    // Start of global module fragment.
+    module;                    // Start of global module fragment.
 
-<header includes>
+    <header includes>
 
-export module <name>;      // Start of module purview.
+    export module <name>;      // Start of module purview.
 
-<module imports>
+    <module imports>
 
-<special header includes>  // Configuration, export, etc.
+    <special header includes>  // Configuration, export, etc.
 
-<module interface>
+    <module interface>
 
-<inline/template includes>
+    <inline/template includes>
     '''
     module_purview_start_prefix: str = 'export module'
+
+    def __init__(self, options: Options, parent_resolver: FilesResolver, file_options: FileOptions):
+        super().__init__(options, parent_resolver, file_options)
+        self.partitions: list[ModuleInterfaceUnitBuilder] = []
 
     def set_is_actually_module(self) -> None:
         pass
@@ -862,6 +865,35 @@ export module <name>;      // Start of module purview.
 
     def get_module_interface_builder(self) -> ModuleInterfaceUnitBuilder | None:
         return None
+
+    def get_is_partition(self) -> bool:
+        return ':' in self.module_name
+
+    def get_external_module_name(self) -> str:
+        if self.get_is_partition():
+            return self.module_name.split(':', 1)[0]
+        return self.module_name
+
+    def get_partition_name(self) -> str:
+        if self.get_is_partition():
+            return self.module_name.split(':', 1)[1]
+        return ''
+
+    def build_result(self):
+        if self.partitions:
+            partition_names: list[str] = []
+            for partition_builder in self.partitions:
+                if partition_builder.get_is_partition():
+                    partition_name: str = partition_builder.get_partition_name()
+                    partition_names.append(f":{partition_name}")
+            partition_names.sort()
+
+            self.add_module_content('')
+
+            for partition_name in partition_names:
+                self.add_module_content(f'''export import {partition_name};''')
+
+        return super().build_result()
 
 class ModuleImplUnitBuilder(ModuleBaseBuilder):
     content_type = ContentType.MODULE_IMPL
@@ -951,7 +983,21 @@ class Converter:
         self.converted_files = 0
         self.copied_files = 0
         self.module_interface_builders: dict[str, ModuleInterfaceUnitBuilder] = {}
+        self.joint_module_builders: dict[str, ModuleInterfaceUnitBuilder] = {}
     
+    def associate_partition_with_joint_builder(self, builder: ModuleInterfaceUnitBuilder, file_options: FileOptions):
+        target_module_name = builder.get_external_module_name()
+        if target_module_name not in self.joint_module_builders:
+            if target_module_name in self.module_interface_builders:
+                joint_builder = self.module_interface_builders[target_module_name]
+            else:
+                joint_builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
+                module_filename = Path(target_module_name + self.options.content_type_to_ext[ContentType.MODULE_INTERFACE])
+                joint_builder.set_source_filename(module_filename)
+                joint_builder.set_module_name(target_module_name)
+            self.joint_module_builders[target_module_name] = joint_builder
+        self.joint_module_builders[target_module_name].partitions.append(builder)
+
     def convert_file_content_to_module(self, content: str, filename: Path, content_type: ContentType, file_options: FileOptions) -> FileContentList:
         if content_type in {ContentType.MODULE_INTERFACE, ContentType.MODULE_IMPL}:
             return [FileContent(filename, content_type, content)]
@@ -985,7 +1031,7 @@ class Converter:
                         scanState = HeaderScanState.MAIN
                         continue
                 case HeaderScanState.FILE_COMMENT:
-                    line2 = line.strip()[0:2] 
+                    line2 = line.strip()[0:2]
                     if (is_comment()
                         or line2[0] == '*'
                         ):
@@ -1018,6 +1064,9 @@ class Converter:
         result: FileContentList = []
         result.append(builder.build_file_content())
 
+        if isinstance(builder, ModuleInterfaceUnitBuilder) and builder.get_is_partition():
+            self.associate_partition_with_joint_builder(builder, file_options)
+
         if file_options.convert_as_compat and builder.content_type == ContentType.MODULE_INTERFACE:
             compat_header_builder = CompatHeaderBuilder(self.options, builder)
             compat_header_builder.set_source_filename(Path(filename))
@@ -1031,7 +1080,14 @@ class Converter:
             file_options = FileOptions()
         match content_type:
             case ContentType.HEADER:
-                builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
+                pure_filename = PurePosixPath(filename)
+                module_name = self.resolver.make_defined_module_for_path(pure_filename)
+                if not module_name:
+                    module_name = self.resolver.convert_filename_to_module_name(pure_filename)
+                if module_name in self.joint_module_builders:
+                    builder = self.joint_module_builders[module_name]
+                else:
+                    builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
             case ContentType.CXX:
                 builder = ModuleImplUnitBuilder(self.options, self.resolver, file_options)
             case _:
@@ -1118,41 +1174,10 @@ class Converter:
         self.create_joined_module_files(destination_directory)
 
     def create_joined_module_files(self, destination_directory: Path):
-        for pattern, target_module in self.options.join_configurations.items():
-            partition_modules: list[str] = []
-            if pattern == '*':
-                partition_modules = list(self.module_interface_builders.keys())
-            else:
-                for module_name in self.module_interface_builders.keys():
-                    if module_name.startswith(f"{target_module}:"):
-                        partition_modules.append(module_name)
-
-            if partition_modules:
-                module_content_lines: list[str] = [
-                    f'''export module {target_module};''',
-                    '',
-                ]
-
-                partition_names: list[str] = []
-                for partition_module in partition_modules:
-                    if ':' in partition_module:
-                        partition_name = partition_module.split(':', 1)[1]
-                        partition_names.append(f":{partition_name}")
-                    else:
-                        # handle modules without colon (should not happen in this context)
-                        partition_names.append(partition_module)
-
-                partition_names.sort()
-
-                for partition_name in partition_names:
-                    module_content_lines.append(f'''export import {partition_name};''')
-
-                module_content = "\n".join(module_content_lines) + "\n"
-
-                output_filename = f"{target_module}{self.options.content_type_to_ext[ContentType.MODULE_INTERFACE]}"
-                output_path = destination_directory / output_filename
-
-                self._create_or_update_file_content_if_diff(output_path, module_content)
+        for _, joint_builder in self.joint_module_builders.items():
+            file_content = joint_builder.build_file_content()
+            output_path = destination_directory / file_content.filename
+            self._create_or_update_file_content_if_diff(output_path, file_content.content)
 
     def add_filesystem_directory(self, directory: Path):
         print('adding filesystem directory', directory)

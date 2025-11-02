@@ -1713,6 +1713,17 @@ def test_dir_custom_join_configurations(dir_simple: Path):
         'mymodule2.cppm',
     ])
 
+def test_dir_partitions_header_match(dir_simple: Path):
+    data_directory = Path('test_data/partitions_header_match')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_join_configuration('mymodule', 'mymodule/*')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'mymodule.cppm',
+        'mymodule/part1.cppm',
+        'mymodule/part2.cppm',
+    ])
+
 def test_resolve_include_to_module_name_use_full_name_true():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
