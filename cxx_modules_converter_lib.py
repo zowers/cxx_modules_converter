@@ -879,6 +879,10 @@ class ModuleInterfaceUnitBuilder(ModuleBaseBuilder):
             return self.module_name.split(':', 1)[1]
         return ''
 
+    def add_partition(self, partition_builder: ModuleInterfaceUnitBuilder) -> None:
+        assert not self.get_is_partition(), "A partition cannot have partitions"
+        self.partitions.append(partition_builder)
+
     def build_result(self):
         if self.partitions:
             partition_names: list[str] = []
@@ -985,18 +989,6 @@ class Converter:
         self.module_interface_builders: dict[str, ModuleInterfaceUnitBuilder] = {}
         self.joint_module_builders: dict[str, ModuleInterfaceUnitBuilder] = {}
     
-    def associate_partition_with_joint_builder(self, builder: ModuleInterfaceUnitBuilder, file_options: FileOptions):
-        target_module_name = builder.get_external_module_name()
-        if target_module_name not in self.joint_module_builders:
-            if target_module_name in self.module_interface_builders:
-                joint_builder = self.module_interface_builders[target_module_name]
-            else:
-                joint_builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
-                module_filename = Path(target_module_name + self.options.content_type_to_ext[ContentType.MODULE_INTERFACE])
-                joint_builder.set_source_filename(module_filename)
-                joint_builder.set_module_name(target_module_name)
-            self.joint_module_builders[target_module_name] = joint_builder
-        self.joint_module_builders[target_module_name].partitions.append(builder)
 
     def convert_file_content_to_module(self, content: str, filename: Path, content_type: ContentType, file_options: FileOptions) -> FileContentList:
         if content_type in {ContentType.MODULE_INTERFACE, ContentType.MODULE_IMPL}:
@@ -1064,9 +1056,6 @@ class Converter:
         result: FileContentList = []
         result.append(builder.build_file_content())
 
-        if isinstance(builder, ModuleInterfaceUnitBuilder) and builder.get_is_partition():
-            self.associate_partition_with_joint_builder(builder, file_options)
-
         if file_options.convert_as_compat and builder.content_type == ContentType.MODULE_INTERFACE:
             compat_header_builder = CompatHeaderBuilder(self.options, builder)
             compat_header_builder.set_source_filename(Path(filename))
@@ -1096,10 +1085,32 @@ class Converter:
         builder.set_source_filename(filename)
 
         if content_type == ContentType.HEADER:
-            self.module_interface_builders[builder.module_name] = cast(ModuleInterfaceUnitBuilder, builder)
+            interface_builder = cast(ModuleInterfaceUnitBuilder, builder)
+            self._add_module_interface_builder(interface_builder)
+            if interface_builder.get_is_partition():
+                self._associate_partition_with_joint_builder(interface_builder, file_options)
         elif content_type == ContentType.CXX:
             cast(ModuleImplUnitBuilder, builder).set_module_interface_builder(self.module_interface_builders.get(builder.module_name, None))
         return builder
+
+    def _associate_partition_with_joint_builder(self, builder: ModuleInterfaceUnitBuilder, file_options: FileOptions):
+        target_module_name = builder.get_external_module_name()
+        if target_module_name not in self.joint_module_builders:
+            if target_module_name in self.module_interface_builders:
+                joint_builder = self.module_interface_builders[target_module_name]
+            else:
+                joint_builder = ModuleInterfaceUnitBuilder(self.options, self.resolver, file_options)
+                module_filename = Path(target_module_name + self.options.content_type_to_ext[ContentType.MODULE_INTERFACE])
+                joint_builder.set_source_filename(module_filename)
+                joint_builder.set_module_name(target_module_name)
+            self._add_joint_module_builder(joint_builder)
+        self.joint_module_builders[target_module_name].add_partition(builder)
+
+    def _add_module_interface_builder(self, builder: ModuleInterfaceUnitBuilder) -> None:
+        self.module_interface_builders[builder.module_name] = builder
+
+    def _add_joint_module_builder(self, builder: ModuleInterfaceUnitBuilder) -> None:
+        self.joint_module_builders[builder.module_name] = builder
 
     def convert_file_content_to_headers(self, content: str, filename: Path, content_type: ContentType, file_options: FileOptions) -> FileContentList:
         if content_type in {ContentType.HEADER, ContentType.CXX}:
