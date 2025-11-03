@@ -533,6 +533,62 @@ class FileBaseBuilder:
         content = self.build_result()
         return FileContent(self.converted_filename(), self.content_type, content)
 
+class FileProcessingState:
+    def __init__(self):
+        self.module_staging: StrList = [] # staging area for next module entry
+        self.flushed_module_preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements flushed to module content
+        self.global_module_fragment_staging: StrList = [] # staging area for next global_module_fragment entry
+        self.preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements
+        self.global_module_fragment_includes_count: int = 0 # count of #include <> statements
+        self.flushed_global_module_fragment_includes_count: int = 0 # count of #include <> statements flushed to global module content
+        self.module_staging_last_unnested_index: int = 0 # last index in module staging without opened preprocessor #if statements
+
+    def add_module_staging(self, line: str, nesting_advance: int):
+        if (self.preprocessor_nesting_count == 0 and nesting_advance == 0
+            or self.preprocessor_nesting_count == 1 and nesting_advance == 1):
+            self.module_staging_last_unnested_index = len(self.module_staging)
+        self.module_staging.append(line)
+        if (self.preprocessor_nesting_count == 0 and nesting_advance == -1):
+            self.module_staging_last_unnested_index = len(self.module_staging)
+
+    def add_global_module_fragment_staging(self, builder: ModuleBaseBuilder, line: str, nesting_advance: int):
+        self.global_module_fragment_staging.append(line)
+        self.flush_global_module_fragment(builder)
+
+    def flush_module_staging(self, builder: ModuleBaseBuilder, last_unnested_inserter: Callable[[], None] | None = None):
+        builder.set_module_purview_start()
+        if self.flushed_global_module_fragment_includes_count == 0 or self.flushed_module_preprocessor_nesting_count != 0:
+            for i in range(len(self.module_staging)):
+                if last_unnested_inserter and i == self.module_staging_last_unnested_index:
+                    last_unnested_inserter()
+                line = self.module_staging[i]
+                builder.module_content.append(line)
+            if last_unnested_inserter and self.module_staging_last_unnested_index == len(self.module_staging):
+                last_unnested_inserter()
+        self.module_staging = []
+        self.flushed_module_preprocessor_nesting_count = self.preprocessor_nesting_count
+        self.flushed_global_module_fragment_includes_count = 0
+        self.module_staging_last_unnested_index = 0
+
+    def flush_global_module_fragment(self, builder: ModuleBaseBuilder):
+        self.flushed_global_module_fragment_includes_count = 0
+        if self.preprocessor_nesting_count != 0:
+            return
+        if self.global_module_fragment_includes_count == 0 and not builder.convert_as_compat_header():
+            return
+        builder.set_global_module_fragment_start()
+        for line in self.global_module_fragment_staging:
+            builder.global_module_fragment.append(line)
+        self.global_module_fragment_staging = []
+        self.flushed_global_module_fragment_includes_count = self.global_module_fragment_includes_count
+        self.global_module_fragment_includes_count = 0
+        self.flush_module_staging(builder)
+
+    def add_staging(self, builder: ModuleBaseBuilder, line: str, nesting_advance: int):
+        self.preprocessor_nesting_count += nesting_advance
+        self.add_module_staging(line, nesting_advance)
+        self.add_global_module_fragment_staging(builder, line, nesting_advance)
+
 class ModuleBaseBuilder(FileBaseBuilder):
     module_purview_start_prefix: str = ''   # 'module' or 'export module' - overriden in implementation classes
     content_type: ContentType = ContentType.OTHER
@@ -552,14 +608,8 @@ class ModuleBaseBuilder(FileBaseBuilder):
         # self.module_purview_special_headers: StrList = [] # // Configuration, export, etc.
         self.module_content: StrList = []
         self.main_module_content_index: int|None = None
-
-        self.module_staging: StrList = [] # staging area for next module entry
-        self.flushed_module_preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements flushed to module content
-        self.global_module_fragment_staging: StrList = [] # staging area for next global_module_fragment entry
-        self.preprocessor_nesting_count: int = 0 # count of opened preprocessor #if statements
-        self.global_module_fragment_includes_count: int = 0 # count of #include <> statements
-        self.flushed_global_module_fragment_includes_count: int = 0 # count of #include <> statements flushed to global module content
-        self.module_staging_last_unnested_index: int = 0 # last index in module staging without opened preprocessor #if statements
+ 
+        self.processing_state: FileProcessingState = FileProcessingState()
 
     def set_source_filename(self, source_filename: Path):
         super().set_source_filename(source_filename)
@@ -620,43 +670,20 @@ class ModuleBaseBuilder(FileBaseBuilder):
     def add_file_copyright(self, line: str):
         self.file_copyright.append(line)
 
-    def _flush_global_module_fragment(self):
-        self.flushed_global_module_fragment_includes_count = 0
-        if self.preprocessor_nesting_count != 0:
-            return
-        if self.global_module_fragment_includes_count == 0 and not self.convert_as_compat_header():
-            return
-        self.set_global_module_fragment_start()
-        for line in self.global_module_fragment_staging:
-            self.global_module_fragment.append(line)
-        self.global_module_fragment_staging = []
-        self.flushed_global_module_fragment_includes_count = self.global_module_fragment_includes_count
-        self.global_module_fragment_includes_count = 0
-        self._flush_module_staging()
-
     def add_global_module_fragment(self, line: str):
-        self.global_module_fragment_includes_count += 1
-        self._add_global_module_fragment_staging(line, 0)
-        self._flush_global_module_fragment()
+        self.processing_state.global_module_fragment_includes_count += 1
+        self.processing_state.add_global_module_fragment_staging(self, line, 0)
+        self.processing_state.flush_global_module_fragment(self)
 
     def handle_preprocessor(self, line: str, nesting_advance: int):
-        self.add_staging(line, nesting_advance)
-
-    def add_staging(self, line: str, nesting_advance: int):
-        self.preprocessor_nesting_count += nesting_advance
-        self._add_module_staging(line, nesting_advance)
-        self._add_global_module_fragment_staging(line, nesting_advance)
-
-    def _add_global_module_fragment_staging(self, line: str, nesting_advance: int):
-        self.global_module_fragment_staging.append(line)
-        self._flush_global_module_fragment()
+        self.processing_state.add_staging(self, line, nesting_advance)
 
     def add_module_purview_special_headers(self, line: str):
         self.set_module_purview_start()
         # self.module_purview_special_headers.append(line)
 
     def handle_main_content(self, line: str):
-        self._flush_module_staging(self._set_main_module_content_start)
+        self.processing_state.flush_module_staging(self, self._set_main_module_content_start)
         self.add_module_content(line)
 
     def _set_main_module_content_start(self):
@@ -693,32 +720,9 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.module_content = self.module_content + module_end
 
     def add_module_content(self, line: str):
-        self._flush_module_staging()
+        self.processing_state.flush_module_staging(self)
         self.set_module_purview_start()
         self.module_content.append(line)
-
-    def _add_module_staging(self, line: str, nesting_advance: int):
-        if (self.preprocessor_nesting_count == 0 and nesting_advance == 0
-            or self.preprocessor_nesting_count == 1 and nesting_advance == 1):
-            self.module_staging_last_unnested_index = len(self.module_staging)
-        self.module_staging.append(line)
-        if (self.preprocessor_nesting_count == 0 and nesting_advance == -1):
-            self.module_staging_last_unnested_index = len(self.module_staging)
-
-    def _flush_module_staging(self, last_unnested_inserter: Callable[[], None] | None = None):
-        self.set_module_purview_start()
-        if self.flushed_global_module_fragment_includes_count == 0 or self.flushed_module_preprocessor_nesting_count != 0:
-            for i in range(len(self.module_staging)):
-                if last_unnested_inserter and i == self.module_staging_last_unnested_index:
-                    last_unnested_inserter()
-                line = self.module_staging[i]
-                self.module_content.append(line)
-            if last_unnested_inserter and self.module_staging_last_unnested_index == len(self.module_staging):
-                last_unnested_inserter()
-        self.module_staging = []
-        self.flushed_module_preprocessor_nesting_count = self.preprocessor_nesting_count
-        self.flushed_global_module_fragment_includes_count = 0
-        self.module_staging_last_unnested_index = 0
 
     def convert_as_compat_header(self):
         return self.file_options.convert_as_compat and self.content_type == ContentType.MODULE_INTERFACE
@@ -745,7 +749,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.add_module_import_from_include(line, match, True)
 
     def handle_pragma_once(self, line: str):
-        self._add_module_staging(f'''// {line}''', 0)
+        self.processing_state.add_module_staging(f'''// {line}''', 0)
 
     def add_module_import_from_include(self, line: str, match: re.Match[str] | None = None, is_quote: bool = False):
         self.set_module_purview_start()
@@ -813,7 +817,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
             # include interface GMF at the start of impl GMF
             self.set_global_module_fragment_start()
             self.global_module_fragment = module_interface_builder.global_module_fragment + self.global_module_fragment
-        self._flush_module_staging()
+        self.processing_state.flush_module_staging(self)
         self._mark_module_interface_unit_export()
         parts = [
             new_line.join(self.file_copyright),
