@@ -153,7 +153,6 @@ def main():
     log_text = '\n'.join(log_messages)
     log(log_text)
     converter.convert_directory(path, Path(destination))
-    log(log_text)
     log(f'done, all: {converter.all_files}, convertable: {converter.convertable_files}, converted: {converter.converted_files}, copied: {converter.copied_files} ')
 
 if __name__ == '__main__':

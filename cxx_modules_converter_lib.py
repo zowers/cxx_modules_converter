@@ -599,6 +599,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         self.resolver: ModuleFilesResolver = ModuleFilesResolver(self.parent_resolver, self.options)
         self.module_name: str = ''                   # name of the module
         self.file_copyright: StrList = []            # // File copyright
+        self.module_dependencies: set[str] = set()   # dependencies for the module
         self.global_module_fragment_start: StrList = []  # module;
         self.global_module_fragment_compat_includes: StrList = []    # compat header includes
         self.global_module_fragment_compat_end: StrList = []    # compat header includes endif
@@ -669,6 +670,9 @@ class ModuleBaseBuilder(FileBaseBuilder):
 
     def add_file_copyright(self, line: str):
         self.file_copyright.append(line)
+
+    def get_module_dependencies(self) -> set[str]:
+        return self.module_dependencies
 
     def add_global_module_fragment(self, line: str):
         self.processing_state.global_module_fragment_includes_count += 1
@@ -778,6 +782,8 @@ class ModuleBaseBuilder(FileBaseBuilder):
             self.add_global_module_fragment(line)
             return
         full_line_module_name = self.resolver.resolve_include_to_module_name(line_include_filename, is_quote, True)
+        if full_line_module_name is not None:
+            self.module_dependencies.add(full_line_module_name)
         if full_line_module_name == self.module_name:
             self.set_is_actually_module()
             self.set_module_purview_start()
@@ -992,6 +998,10 @@ class Converter:
         self.copied_files = 0
         self.module_interface_builders: dict[str, ModuleInterfaceUnitBuilder] = {}
         self.joint_module_builders: dict[str, ModuleInterfaceUnitBuilder] = {}
+        # dependency graph: module_name -> set of imported modules
+        self.module_dependencies: dict[str, set[str]] = {}
+        # list of found circular dependencies
+        self.circular_dependencies: list[list[str]] = []
     
 
     def convert_file_content_to_module(self, content: str, filename: Path, content_type: ContentType, file_options: FileOptions) -> FileContentList:
@@ -1059,6 +1069,9 @@ class Converter:
 
         result: FileContentList = []
         result.append(builder.build_file_content())
+
+        module_dependencies = builder.get_module_dependencies()
+        self.add_module_dependencies(builder.module_name, module_dependencies)
 
         if file_options.convert_as_compat and builder.content_type == ContentType.MODULE_INTERFACE:
             compat_header_builder = CompatHeaderBuilder(self.options, builder)
@@ -1187,12 +1200,30 @@ class Converter:
             self.convert_directory_impl(source_directory, destination_directory, Path(), FileOptions())
 
         self.create_joined_module_files(destination_directory)
+        self.print_circular_dependencies()
 
     def create_joined_module_files(self, destination_directory: Path):
         for _, joint_builder in self.joint_module_builders.items():
             file_content = joint_builder.build_file_content()
             output_path = destination_directory / file_content.filename
             self._create_or_update_file_content_if_diff(output_path, file_content.content)
+
+    def add_module_dependencies(self, module_name: str, imported_module_names: set[str]) -> None:
+        if module_name not in self.module_dependencies:
+            self.module_dependencies[module_name] = set()
+        self.module_dependencies[module_name].update(imported_module_names)
+
+    def print_circular_dependencies(self) -> None:
+        self.circular_dependencies = find_cycles(self.module_dependencies)
+        
+        if not self.circular_dependencies:
+            return
+            
+        circular_dependencies_count = len(self.circular_dependencies)
+        print(f"WARNING: Circular dependencies detected, count: {circular_dependencies_count}")
+        for i, cycle in enumerate(self.circular_dependencies, 1):
+            cycle_str = " -> ".join(cycle)
+            print(f"WARNING: Circular dependency {i}/{circular_dependencies_count}: {cycle_str}")
 
     def add_filesystem_directory(self, directory: Path):
         print('adding filesystem directory', directory)
@@ -1239,6 +1270,49 @@ def convert_file_content(action: ConvertAction, content: str, filename: str) -> 
     converter = Converter(action)
     file_content_list: FileContentList = converter.convert_file_content(content, filename, FileOptions())
     return file_content_list[0].content
+
+def find_cycles(dependencies: dict[str, set[str]]) -> list[list[str]]:
+    visited: set[str] = set()
+    rec_stack: set[str] = set()
+    path: list[str] = []
+    cycles: list[list[str]] = []
+    
+    def dfs(node: str) -> None:
+        if node in rec_stack:
+            # Cycle detected
+            try:
+                cycle_start_index = path.index(node)
+                cycle = path[cycle_start_index:] + [node]
+                # Skip self-references (A -> A)
+                if len(cycle) > 1:
+                    cycles.append(cycle)
+            except ValueError:
+                pass
+            return
+        
+        if node in visited:
+            return
+            
+        visited.add(node)
+        rec_stack.add(node)
+        path.append(node)
+        
+        # Recursively traverse all neighbors
+        if node in dependencies:
+            for neighbor in dependencies[node]:
+                # Skip self-dependencies
+                if neighbor != node:
+                    dfs(neighbor)
+        
+        path.pop()
+        rec_stack.remove(node)
+    
+    # Run DFS for all nodes
+    for node in dependencies:
+        if node not in visited:
+            dfs(node)
+    
+    return cycles
 
 def convert_directory(action: ConvertAction, source_directory: Path, destination_directory: Path, subdir: str | None = None):
     converter = Converter(action)
