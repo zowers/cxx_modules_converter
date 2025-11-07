@@ -2028,6 +2028,9 @@ def test_dir_circular_dependencies_impl(dir_simple: Path):
         'moduleA.cpp',
         'moduleB.cpp',
         'moduleC.cpp',
+        'main.cpp',
+        'CMakeLists.txt',
+        'CMakePresets.json',
     ])
 
     assert len(converter.circular_dependencies) == 1
