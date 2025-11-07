@@ -1885,15 +1885,17 @@ def test_dir_circular_dependencies(dir_simple: Path):
     converter = Converter(ConvertAction.MODULES)
     converter.convert_directory(data_directory.joinpath('input'), dir_simple)
     
-    # Check that files were converted correctly
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'moduleA.cppm',
         'moduleB.cppm',
         'moduleC.cppm',
     ])
-    
-    # Check that circular dependencies were detected
-    assert len(converter.circular_dependencies) >= 0
+
+    assert len(converter.circular_dependencies) == 1
+
+    cycle = converter.circular_dependencies[0]
+    expected_modules = {'moduleA', 'moduleB', 'moduleC'}
+    assert set(cycle) == expected_modules
 
 
 def test_dir_circular_dependencies_self(dir_simple: Path):
@@ -1901,12 +1903,53 @@ def test_dir_circular_dependencies_self(dir_simple: Path):
     data_directory = Path('test_data/circular_dependency_self')
     converter = Converter(ConvertAction.MODULES)
     converter.convert_directory(data_directory.joinpath('input'), dir_simple)
-    
-    # Check that files were converted correctly
+
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'moduleA.cppm',
         'moduleA.cpp',
     ])
-    
-    # Check that no circular dependencies were detected
+
     assert len(converter.circular_dependencies) == 0
+
+
+def test_dir_circular_dependencies_partitions(dir_simple: Path):
+    """Test for detecting circular dependencies in partitions"""
+    data_directory = Path('test_data/circular_partitions')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_join_configuration('mymodule', '*')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'part1.cppm',
+        'part2.cppm',
+        'part3.cppm',
+        'mymodule.cppm',
+    ])
+
+    assert len(converter.circular_dependencies) == 1
+
+    cycle = converter.circular_dependencies[0]
+    expected_modules = {'mymodule:part1', 'mymodule:part2', 'mymodule:part3'}
+    assert set(cycle) == expected_modules
+
+
+def test_dir_circular_dependencies_partitions_impl(dir_simple: Path):
+    """Test for detecting circular dependencies in partitions implementation"""
+    data_directory = Path('test_data/circular_partitions_impl')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_join_configuration('mymodule', '*')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'part1.cppm',
+        'part2.cppm',
+        'part1.cpp',
+        'part2.cpp',
+        'mymodule.cppm',
+    ])
+
+    assert len(converter.circular_dependencies) == 1
+
+    cycle = converter.circular_dependencies[0]
+    expected_modules = {'mymodule:part1', 'mymodule:part2'}
+    assert set(cycle) == expected_modules
