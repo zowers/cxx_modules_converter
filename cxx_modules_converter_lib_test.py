@@ -17,6 +17,8 @@ from cxx_modules_converter_lib import (
     FileContent,
     find_cycles,
     )
+import subprocess
+
 
 def test_module_empty():
     converted = convert_file_content(
@@ -1367,6 +1369,8 @@ def dir_simple(tmp_path_factory: pytest.TempPathFactory):
 def assert_files(expected_dir: Path, result_dir: Path, expected_files: list[str]):
     result_files: set[str] = set()
     for (root, _, files) in os.walk(result_dir):
+        if 'build' in Path(root).parts:
+            continue
         relative_root = Path(os.path.relpath(root, result_dir))
         for name in files:
             result_files.add(relative_root.joinpath(name).as_posix())
@@ -1382,13 +1386,70 @@ def assert_files(expected_dir: Path, result_dir: Path, expected_files: list[str]
             result_content = result_file.read()
         assert(result_content == expected_content)
 
+def run_cmake_test(dir_simple: Path, preset: str):
+    configure_cmd = ["cmake", "--preset", preset, "--fresh"]
+    result_configure = subprocess.run(
+        configure_cmd,
+        cwd=dir_simple,
+        capture_output=True,
+        text=True
+    )
+    
+    assert result_configure.returncode == 0, (
+        f"CMake configure failed for preset {preset}:\n"
+        f"Command: {' '.join(configure_cmd)}\n"
+        f"STDOUT:\n{result_configure.stdout}\n"
+        f"STDERR:\n{result_configure.stderr}"
+    )
+    
+    build_cmd = ["cmake", "--build", "--preset", preset]
+    result_build = subprocess.run(
+        build_cmd,
+        cwd=dir_simple,
+        capture_output=True,
+        text=True
+    )
+    
+    assert result_build.returncode == 0, (
+        f"CMake build failed for preset {preset}:\n"
+        f"Command: {' '.join(build_cmd)}\n"
+        f"STDOUT:\n{result_build.stdout}\n"
+        f"STDERR:\n{result_build.stderr}"
+    )
+
+CMAKE_TEST_CASES = [
+    "test-clang-20",
+    "test-clang-21",
+    "test-gcc-15"
+]
+
+
 def test_dir_simple(dir_simple: Path):
     data_directory = Path('test_data/simple')
     convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
     assert_files(data_directory.joinpath('expected'), dir_simple, [
         'simple.cppm',
         'simple.cpp',
+        'main.cpp',
+        'CMakeLists.txt',
+        'CMakePresets.json',
     ])
+
+@pytest.mark.slow
+@pytest.mark.parametrize("preset", CMAKE_TEST_CASES)
+def test_dir_simple_cmake(dir_simple: Path, preset: str):
+    data_directory = Path('test_data/simple')
+    convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'simple.cppm',
+        'simple.cpp',
+        'main.cpp',
+        'CMakeLists.txt',
+        'CMakePresets.json',
+    ])
+    
+    run_cmake_test(dir_simple, preset)
+
 
 def test_dir_simple_std(dir_simple: Path):
     data_directory = Path('test_data/simple_std')
