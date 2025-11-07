@@ -2035,3 +2035,24 @@ def test_dir_circular_dependencies_impl(dir_simple: Path):
     cycle = converter.circular_dependencies[0]
     expected_modules = {'moduleA', 'moduleB', 'moduleC'}
     assert set(cycle) == expected_modules
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("preset", CMAKE_TEST_CASES)
+def test_dir_circular_dependencies_impl_cmake(dir_simple: Path, preset: str):
+    """Test for detecting circular dependencies implementation without partitions using CMake"""
+    data_directory = Path('test_data/circular_impl')
+    convert_directory(ConvertAction.MODULES, data_directory.joinpath('input'), dir_simple)
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'moduleA.cppm',
+        'moduleB.cppm',
+        'moduleC.cppm',
+        'moduleA.cpp',
+        'moduleB.cpp',
+        'moduleC.cpp',
+        'main.cpp',
+        'CMakeLists.txt',
+        'CMakePresets.json',
+    ])
+    
+    run_cmake_test(dir_simple, preset)

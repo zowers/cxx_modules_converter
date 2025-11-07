@@ -1,0 +1,48 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+            }
+        },
+        {
+            "name": "test-clang-20",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang++-20"
+            }
+        },
+        {
+            "name": "test-clang-21",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang++-21"
+            }
+        },
+        {
+            "name": "test-gcc-15",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "g++-15"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "test-clang-20",
+            "configurePreset": "test-clang-20"
+        },
+        {
+            "name": "test-clang-21",
+            "configurePreset": "test-clang-21"
+        },
+        {
+            "name": "test-gcc-15",
+            "configurePreset": "test-gcc-15"
+        }
+    ]
+}
