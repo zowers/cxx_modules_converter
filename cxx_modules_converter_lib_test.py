@@ -1953,3 +1953,24 @@ def test_dir_circular_dependencies_partitions_impl(dir_simple: Path):
     cycle = converter.circular_dependencies[0]
     expected_modules = {'mymodule:part1', 'mymodule:part2'}
     assert set(cycle) == expected_modules
+
+def test_dir_circular_dependencies_impl(dir_simple: Path):
+    """Test for detecting circular dependencies implementation without partitions"""
+    data_directory = Path('test_data/circular_impl')
+    converter = Converter(ConvertAction.MODULES)
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'moduleA.cppm',
+        'moduleB.cppm',
+        'moduleC.cppm',
+        'moduleA.cpp',
+        'moduleB.cpp',
+        'moduleC.cpp',
+    ])
+
+    assert len(converter.circular_dependencies) == 1
+
+    cycle = converter.circular_dependencies[0]
+    expected_modules = {'moduleA', 'moduleB', 'moduleC'}
+    assert set(cycle) == expected_modules
