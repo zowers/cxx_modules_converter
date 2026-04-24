@@ -1451,6 +1451,29 @@ def test_dir_simple_cmake(dir_simple: Path, preset: str):
     run_cmake_test(dir_simple, preset)
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize("preset", CMAKE_TEST_CASES)
+def test_dir_circular_dependencies_partitions_impl_cmake(dir_simple: Path, preset: str):
+    """Test for detecting circular dependencies in partitions implementation using CMake"""
+    data_directory = Path('test_data/circular_partitions_impl')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.add_join_configuration('mymodule', 'mymodule/*')
+    converter.convert_directory(data_directory.joinpath('input'), dir_simple)
+    
+    assert_files(data_directory.joinpath('expected'), dir_simple, [
+        'mymodule/part1.cppm',
+        'mymodule/part2.cppm',
+        'mymodule/part1.cpp',
+        'mymodule/part2.cpp',
+        'mymodule.cppm',
+        'main.cpp',
+        'CMakeLists.txt',
+        'CMakePresets.json',
+    ])
+    
+    run_cmake_test(dir_simple, preset)
+
+
 def test_dir_simple_std(dir_simple: Path):
     data_directory = Path('test_data/simple_std')
     converter = Converter(ConvertAction.MODULES)
@@ -1998,15 +2021,18 @@ def test_dir_circular_dependencies_partitions_impl(dir_simple: Path):
     """Test for detecting circular dependencies in partitions implementation"""
     data_directory = Path('test_data/circular_partitions_impl')
     converter = Converter(ConvertAction.MODULES)
-    converter.options.add_join_configuration('mymodule', '*')
+    converter.options.add_join_configuration('mymodule', 'mymodule/*')
     converter.convert_directory(data_directory.joinpath('input'), dir_simple)
 
     assert_files(data_directory.joinpath('expected'), dir_simple, [
-        'part1.cppm',
-        'part2.cppm',
-        'part1.cpp',
-        'part2.cpp',
+        'mymodule/part1.cppm',
+        'mymodule/part2.cppm',
+        'mymodule/part1.cpp',
+        'mymodule/part2.cpp',
         'mymodule.cppm',
+        'main.cpp',
+        'CMakeLists.txt',
+        'CMakePresets.json',
     ])
 
     assert len(converter.circular_dependencies) == 1
