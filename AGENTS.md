@@ -1,0 +1,192 @@
+# AGENTS.md - Information for AI about cxx_modules_converter project
+
+## Project Overview
+
+**cxx_modules_converter** is a Python tool for converting C++ headers to C++20 modules and vice versa. The project automates migration of traditional C++ projects to modern C++20 modules.
+
+## Project Architecture
+
+### Core Components
+
+1. **CLI Interface** (`cxx_modules_converter.py`)
+   - Command line argument processing
+   - Conversion process coordination
+   - Logging and statistics output
+
+2. **Core Library** (`cxx_modules_converter_lib.py`)
+   - `Converter` - main conversion class
+   - `Options` - conversion configuration
+   - `FilesResolver` - path and module resolution
+   - `ModuleBaseBuilder` and subclasses - module builders
+   - `FilesMap` - file map for searching
+
+3. **Test Infrastructure**
+   - `cxx_modules_converter_lib_test.py` - unit tests
+   - `test_data/` - test data with input/expected structure
+
+### Key Concepts
+
+- **ContentType**: `HEADER`, `CXX`, `MODULE_INTERFACE`, `MODULE_IMPL`, `OTHER`
+- **ConvertAction**: `MODULES` (headers → modules), `HEADERS` (modules → headers)
+- **Module naming**: paths converted to module names using dots (e.g., `subdir/file.h` → `subdir.file`)
+
+## Current Issues (for AI to fix)
+
+### Critical
+1. **Logging**: Using `print()` instead of `logging`
+   - Files: `cxx_modules_converter_lib.py:222, 242, 319, 1165, 1168, 1198, 1209`
+   - Task: Replace with structured logging with levels
+
+2. **Error Handling**: `assert()` in production code
+   - Files: `cxx_modules_converter.py:91, 142, 146` and `cxx_modules_converter_lib.py:216, 277, 621, 663, 664, 813, 948, 950, 955`
+   - Task: Replace with explicit exceptions
+
+3. **Monolithic Code**: Single file with 1246 lines
+   - Task: Split into modules (options.py, resolvers.py, builders.py, converter.py, utils.py)
+
+### Architectural
+4. **Dependency Resolution**: Complex logic in `FilesResolver`
+5. **Module Building**: Multiple Builder classes with inheritance
+6. **Configuration**: `Options` class is too large
+
+## Recommendations for AI Working on the Project
+
+### During Refactoring
+1. **Maintain API backward compatibility**
+   - Don't change public class methods
+   - Use deprecation warnings for old APIs
+   - Update version in pyproject.toml
+
+2. **Test every change**
+   - Run `pytest` after each change
+   - Use test data from `test_data/`
+   - Check edge cases
+
+3. **Follow code style**
+   - Use type hints (already present)
+   - Naming: snake_case for functions/variables, PascalCase for classes
+   - Document public methods
+
+### When Adding Functionality
+1. **Extend, don't modify**
+   - Add new parameters to `Options` with default values
+   - Create new classes instead of modifying existing ones
+   - Use inheritance for specialization
+
+2. **Add tests**
+   - Create test data in `test_data/new_feature/`
+   - Write unit tests for new functionality
+   - Update existing tests if necessary
+
+3. **Document changes**
+   - Update README.md for new CLI features
+   - Add docstrings for new classes/methods
+   - Update usage examples
+
+## Test Data Structure
+
+```
+test_data/
+├── test_case_name/
+│   ├── input/          # Source files for conversion
+│   │   ├── file1.h
+│   │   └── subdir/file2.cpp
+│   └── expected/       # Expected result
+│       ├── file1.cppm
+│       └── subdir/file2.cpp
+```
+
+**Important**: Tests compare conversion results with expected files.
+
+## Common Code Patterns
+
+### 1. Processing Include Directives
+```python
+if m.match(preprocessor_include_brackets_rx, line):
+    builder.handle_include_brackets(line, m.matched)
+elif m.match(preprocessor_include_quote_rx, line):
+    builder.handle_include_quote(line, m.matched)
+```
+
+### 2. Building Modules
+```python
+builder = ModuleInterfaceUnitBuilder(options, resolver, file_options)
+builder.set_module_name(module_name)
+builder.add_module_content("// implementation")
+```
+
+### 3. Converting Files
+```python
+converter = Converter(ConvertAction.MODULES)
+converter.options.set_root_dir_module_name("mymodule")
+converter.convert_directory(input_path, output_path)
+```
+
+## Known Limitations
+
+1. **Preprocessor**: Limited support for complex macros
+2. **System Headers**: Only basic transformations
+3. **Performance**: No caching, repeated file reads
+4. **Memory**: Loads all files into memory
+
+## Improvement Paths (for AI Agents)
+
+### Low-level Tasks
+- [ ] Replace `print()` with `logging` in all files
+- [ ] Create `exceptions.py` with custom exceptions
+- [ ] Split `cxx_modules_converter_lib.py` into modules
+
+### Mid-level Tasks
+- [ ] Add caching for parsing results
+- [ ] Improve preprocessor directive handling
+- [ ] Add configuration validation
+
+### High-level Tasks
+- [ ] Implement incremental conversion
+- [ ] Add C++23 module support
+- [ ] Create plugin system
+
+## Working Commands
+
+### Testing
+```bash
+# Run all tests
+pytest -vv
+
+# Run specific test
+pytest cxx_modules_converter_lib_test.py::test_module_empty -vv
+
+# Run with coverage
+pytest --cov=cxx_modules_converter_lib --cov-report=html
+```
+
+### Development
+```bash
+# Install dependencies
+pip install -r requirements-test.txt
+
+# Run the script
+python cxx_modules_converter.py -s test_data/simple/input -d output
+
+# Type checking
+mypy cxx_modules_converter.py cxx_modules_converter_lib.py
+```
+
+## Contacts and Resources
+
+- **Author**: Alexander Petrov (zowers@zowers.net)
+- **Repository**: https://gitverse.ru/zowers/cxx_modules_converter
+- **Documentation**: README.md
+- **Version**: 0.1.17 (see pyproject.toml)
+
+## For AI Agents: How to Help the Project
+
+1. **Start small**: Fix one `print()` or `assert()` usage
+2. **Test**: Ensure tests pass after changes
+3. **Document**: Explain what and why was changed
+4. **Follow the plan**: See TODO.md for priorities and timelines
+5. **Use English**: Ensure all changes maintain English-only policy
+
+---
+*Document created to assist AI agents in understanding and improving the project*
+*Version: 1.1 | Date: 2026-05-10 | Status: Current*
