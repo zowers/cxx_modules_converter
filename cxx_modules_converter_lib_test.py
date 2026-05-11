@@ -781,7 +781,7 @@ def test_resolve_include():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('subdir/simple.cpp', ContentType.CXX)
     resolver = builder.resolver
-    assert(resolver.module_dir == PurePosixPath('subdir'))
+    assert(resolver.module_dir == Path('subdir'))
     assert(resolver.resolve_include('simple.h', True) == PurePosixPath('simple.h'))
     assert(resolver.resolve_include('simple.h', False) is None)
     # make `simple.h` available in subdir
@@ -802,7 +802,7 @@ def test_resolve_include_no_dir():
     converter = Converter(ConvertAction.MODULES)
     builder = converter.make_builder_to_module('simple.cpp', ContentType.CXX)
     resolver = builder.resolver
-    assert(resolver.module_dir == PurePosixPath(''))
+    assert(resolver.module_dir == Path(''))
     assert(resolver.resolve_include('simple.h', True) == PurePosixPath('simple.h'))
     assert(resolver.resolve_include('simple.h', False) is None)
     # make `simple.h` available
@@ -1469,6 +1469,7 @@ def test_dir_circular_dependencies_partitions_impl_cmake(dir_simple: Path, prese
         'main.cpp',
         'CMakeLists.txt',
         'CMakePresets.json',
+        'build.sh',
     ])
     
     run_cmake_test(dir_simple, preset)
@@ -2033,6 +2034,7 @@ def test_dir_circular_dependencies_partitions_impl(dir_simple: Path):
         'main.cpp',
         'CMakeLists.txt',
         'CMakePresets.json',
+        'build.sh',
     ])
 
     assert len(converter.circular_dependencies) == 1
