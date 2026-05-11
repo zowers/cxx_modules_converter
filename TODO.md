@@ -18,10 +18,13 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [`cxx_modules_converter_lib.py:222`](cxx_modules_converter_lib.py:222) - `print(f'warning: path {path} already mapped...')`
 - [`cxx_modules_converter_lib.py:242`](cxx_modules_converter_lib.py:242) - `print(f'warning: pattern "{pattern}" already mapped...')`
 - [`cxx_modules_converter_lib.py:319`](cxx_modules_converter_lib.py:319) - `print(f'warning: file not found: "{include_filename}"...')`
-- [`cxx_modules_converter_lib.py:1165`](cxx_modules_converter_lib.py:1165) - `print('converting', filename)`
-- [`cxx_modules_converter_lib.py:1168`](cxx_modules_converter_lib.py:1168) - `print('converted ', converted_file.filename, ...)`
-- [`cxx_modules_converter_lib.py:1198`](cxx_modules_converter_lib.py:1198) - `print('adding filesystem directory', directory)`
-- [`cxx_modules_converter_lib.py:1209`](cxx_modules_converter_lib.py:1209) - `print(f'skipping "{filename}"')`
+- [`cxx_modules_converter_lib.py:762`](cxx_modules_converter_lib.py:762) - `print('warning: preprocessor_include_local_rx not matched')`
+- [`cxx_modules_converter_lib.py:1178`](cxx_modules_converter_lib.py:1178) - `print('converting', filename)`
+- [`cxx_modules_converter_lib.py:1181`](cxx_modules_converter_lib.py:1181) - `print('converted ', converted_file.filename, ...)`
+- [`cxx_modules_converter_lib.py:1223`](cxx_modules_converter_lib.py:1223) - `print(f"WARNING: Circular dependencies detected, count: {circular_dependencies_count}")`
+- [`cxx_modules_converter_lib.py:1226`](cxx_modules_converter_lib.py:1226) - `print(f"WARNING: Circular dependency {i}/{circular_dependencies_count}: {cycle_str}")`
+- [`cxx_modules_converter_lib.py:1229`](cxx_modules_converter_lib.py:1229) - `print('adding filesystem directory', directory)`
+- [`cxx_modules_converter_lib.py:1240`](cxx_modules_converter_lib.py:1240) - `print(f'skipping "{filename}"')`
 
 ### 1.2. Improve Error Handling
 **Problem**: Multiple `assert()` statements without exception handling in production code.
@@ -40,13 +43,13 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [`cxx_modules_converter.py:146`](cxx_modules_converter.py:146) - `assert(not parsed_args.modulestd)`
 - [`cxx_modules_converter_lib.py:216`](cxx_modules_converter_lib.py:216) - `assert(ext != '.')`
 - [`cxx_modules_converter_lib.py:277`](cxx_modules_converter_lib.py:277) - `assert(type(parent_node) is dict)`
-- [`cxx_modules_converter_lib.py:621`](cxx_modules_converter_lib.py:621) - `assert(module_name)`
-- [`cxx_modules_converter_lib.py:663`](cxx_modules_converter_lib.py:663) - `assert(self.module_purview_start_prefix)`
-- [`cxx_modules_converter_lib.py:664`](cxx_modules_converter_lib.py:664) - `assert(self.module_name)`
-- [`cxx_modules_converter_lib.py:813`](cxx_modules_converter_lib.py:813) - `assert(bool(self.global_module_fragment_start)...)`
-- [`cxx_modules_converter_lib.py:948`](cxx_modules_converter_lib.py:948) - `assert(module_builder.content_type == ContentType.MODULE_INTERFACE)`
-- [`cxx_modules_converter_lib.py:950`](cxx_modules_converter_lib.py:950) - `assert(module_interface_unit_filename)`
-- [`cxx_modules_converter_lib.py:955`](cxx_modules_converter_lib.py:955) - `assert(compat_macro)`
+- [`cxx_modules_converter_lib.py:622`](cxx_modules_converter_lib.py:622) - `assert(module_name)`
+- [`cxx_modules_converter_lib.py:664`](cxx_modules_converter_lib.py:664) - `assert(self.module_purview_start_prefix)`
+- [`cxx_modules_converter_lib.py:665`](cxx_modules_converter_lib.py:665) - `assert(self.module_name)`
+- [`cxx_modules_converter_lib.py:819`](cxx_modules_converter_lib.py:819) - `assert(bool(self.global_module_fragment_start)...)`
+- [`cxx_modules_converter_lib.py:954`](cxx_modules_converter_lib.py:954) - `assert(module_builder.content_type == ContentType.MODULE_INTERFACE)`
+- [`cxx_modules_converter_lib.py:956`](cxx_modules_converter_lib.py:956) - `assert(module_interface_unit_filename)`
+- [`cxx_modules_converter_lib.py:961`](cxx_modules_converter_lib.py:961) - `assert(compat_macro)`
 
 ### 1.3. Refactor Large Files
 **Problem**: Large monolithic file `cxx_modules_converter_lib.py` (1246 lines).

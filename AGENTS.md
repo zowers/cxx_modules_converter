@@ -34,11 +34,11 @@
 
 ### Critical
 1. **Logging**: Using `print()` instead of `logging`
-   - Files: `cxx_modules_converter_lib.py:222, 242, 319, 1165, 1168, 1198, 1209`
+   - Files: `cxx_modules_converter_lib.py:222, 242, 319, 762, 1178, 1181, 1223, 1226, 1229, 1240`
    - Task: Replace with structured logging with levels
 
 2. **Error Handling**: `assert()` in production code
-   - Files: `cxx_modules_converter.py:91, 142, 146` and `cxx_modules_converter_lib.py:216, 277, 621, 663, 664, 813, 948, 950, 955`
+   - Files: `cxx_modules_converter.py:91, 142, 146` and `cxx_modules_converter_lib.py:216, 277, 622, 664, 665, 819, 954, 956, 961`
    - Task: Replace with explicit exceptions
 
 3. **Monolithic Code**: Single file with 1246 lines
