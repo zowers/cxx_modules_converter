@@ -5,6 +5,7 @@
 
 import argparse
 import importlib.metadata
+import logging
 from pathlib import Path
 import sys
 
@@ -66,21 +67,29 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument('--join', action='append', default=[],
                         help='A=B means create module A with partition modules for files matching pattern B. '
                              'Example: --join A=A/* creates module A with partitions for all files in A/ directory.')
+    parser.add_argument('--log-level', default='INFO',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+                        help='Set logging level (DEBUG, INFO, WARNING, ERROR). Default: INFO')
     parser.add_argument('-v', '--version', default=False, action='store_true', help='show version')
     parsed_args = parser.parse_args(argv)
     return parsed_args
 
-def log(message: str):
-    print('cxx_modules_converter:', message)
-
 def main():
     parsed_args = parse_args()
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, parsed_args.log_level),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger(__name__)
+    
     if parsed_args.version:
         version = get_version()
-        log(f'{version}')
+        logger.info(f'{version}')
         return
     if not parsed_args.directory:
-        log('--directory argument is required')
+        logger.error('--directory argument is required')
         return 1
     log_messages: list[str] = []
     log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {"inplace" if parsed_args.inplace else " into " + parsed_args.destination}')
@@ -151,9 +160,9 @@ def main():
         log_messages.append(f'join: "{target_module}" from pattern "{pattern}"')
         converter.options.add_join_configuration(target_module, pattern)
     log_text = '\n'.join(log_messages)
-    log(log_text)
+    logger.info(log_text)
     converter.convert_directory(path, Path(destination))
-    log(f'done, all: {converter.all_files}, convertable: {converter.convertable_files}, converted: {converter.converted_files}, copied: {converter.copied_files} ')
+    logger.info(f'done, all: {converter.all_files}, convertable: {converter.convertable_files}, converted: {converter.converted_files}, copied: {converter.copied_files}')
 
 if __name__ == '__main__':
     sys.exit(main())

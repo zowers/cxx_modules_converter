@@ -5,27 +5,6 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ## Priority 1: Immediate Improvements
 
-### 1.1. Add Structured Logging
-**Problem**: Using `print()` for warnings instead of structured logging.
-
-**Tasks:**
-- [ ] Replace all `print()` calls with the `logging` module
-- [ ] Add logging levels (DEBUG, INFO, WARNING, ERROR)
-- [ ] Configure formatter for readable logs
-- [ ] Add ability to configure log level via CLI
-
-**Files to modify:**
-- [`cxx_modules_converter_lib.py:222`](cxx_modules_converter_lib.py:222) - `print(f'warning: path {path} already mapped...')`
-- [`cxx_modules_converter_lib.py:242`](cxx_modules_converter_lib.py:242) - `print(f'warning: pattern "{pattern}" already mapped...')`
-- [`cxx_modules_converter_lib.py:319`](cxx_modules_converter_lib.py:319) - `print(f'warning: file not found: "{include_filename}"...')`
-- [`cxx_modules_converter_lib.py:762`](cxx_modules_converter_lib.py:762) - `print('warning: preprocessor_include_local_rx not matched')`
-- [`cxx_modules_converter_lib.py:1178`](cxx_modules_converter_lib.py:1178) - `print('converting', filename)`
-- [`cxx_modules_converter_lib.py:1181`](cxx_modules_converter_lib.py:1181) - `print('converted ', converted_file.filename, ...)`
-- [`cxx_modules_converter_lib.py:1223`](cxx_modules_converter_lib.py:1223) - `print(f"WARNING: Circular dependencies detected, count: {circular_dependencies_count}")`
-- [`cxx_modules_converter_lib.py:1226`](cxx_modules_converter_lib.py:1226) - `print(f"WARNING: Circular dependency {i}/{circular_dependencies_count}: {cycle_str}")`
-- [`cxx_modules_converter_lib.py:1229`](cxx_modules_converter_lib.py:1229) - `print('adding filesystem directory', directory)`
-- [`cxx_modules_converter_lib.py:1240`](cxx_modules_converter_lib.py:1240) - `print(f'skipping "{filename}"')`
-
 ### 1.2. Improve Error Handling
 **Problem**: Multiple `assert()` statements without exception handling in production code.
 

@@ -4,6 +4,7 @@ import fnmatch
 from collections.abc import Callable
 import copy
 import enum
+import logging
 import os
 import os.path
 from pathlib import Path, PurePosixPath
@@ -219,7 +220,7 @@ class Options:
     def add_modules_path(self, module_prefix: str, pathStr: str):
         path = PurePosixPath(pathStr)
         if path in self.path_to_module_prefix_map:
-            print(f'warning: path {path} already mapped to module prefix {self.path_to_module_prefix_map[path]}')
+            logging.warning(f'path {path} already mapped to module prefix {self.path_to_module_prefix_map[path]}')
             return
         self.path_to_module_prefix_map[path] = module_prefix
 
@@ -239,7 +240,7 @@ class Options:
     
     def add_join_configuration(self, target_module: str, pattern: str):
         if pattern in self.join_configurations:
-            print(f'warning: pattern "{pattern}" already mapped to target module "{self.join_configurations[pattern]}"')
+            logging.warning(f'pattern "{pattern}" already mapped to target module "{self.join_configurations[pattern]}"')
             return
         self.join_configurations[pattern] = target_module
 
@@ -316,7 +317,7 @@ class FilesResolver:
             if self.files_map.find(path):
                 return path
         if is_quote:
-            print(f'warning: file not found: "{include_filename}" referenced from "{current_filename}"')
+            logging.warning(f'file not found: "{include_filename}" referenced from "{current_filename}"')
             return include_path
         return None
 
@@ -760,7 +761,7 @@ class ModuleBaseBuilder(FileBaseBuilder):
         if not match:
             match = preprocessor_include_quote_rx.match(line)
         if not match:
-            print('warning: preprocessor_include_local_rx not matched')
+            logging.warning('preprocessor_include_local_rx not matched')
             self.add_module_content(line)
             return
 
@@ -1175,10 +1176,10 @@ class Converter:
         if content_type == ContentType.OTHER or any_pattern_maches(self.options.always_include_names, PurePosixPath(filename)):
             self._copy_file_content_if_diff(source_directory.joinpath(filename), destination_directory.joinpath(filename))
         else:
-            print('converting', filename)
+            logging.info(f'converting {filename}')
             converted_files = self.convert_file(source_directory, destination_directory, filename, file_options)
             for converted_file in converted_files:
-                print('converted ', converted_file.filename, '\t', converted_file.content_type)
+                logging.info(f'converted {converted_file.filename}\t{converted_file.content_type}')
 
     def _copy_file_content_if_diff(self, source_file_path: Path, destination_file_path: Path):
         with open(source_file_path, 'rb') as source_file:
@@ -1220,13 +1221,13 @@ class Converter:
             return
             
         circular_dependencies_count = len(self.circular_dependencies)
-        print(f"WARNING: Circular dependencies detected, count: {circular_dependencies_count}")
+        logging.warning(f"Circular dependencies detected, count: {circular_dependencies_count}")
         for i, cycle in enumerate(self.circular_dependencies, 1):
             cycle_str = " -> ".join(cycle)
-            print(f"WARNING: Circular dependency {i}/{circular_dependencies_count}: {cycle_str}")
+            logging.warning(f"Circular dependency {i}/{circular_dependencies_count}: {cycle_str}")
 
     def add_filesystem_directory(self, directory: Path):
-        print('adding filesystem directory', directory)
+        logging.info(f'adding filesystem directory {directory}')
         self.resolver.files_map.add_filesystem_directory(directory)
 
     def convert_directory_impl(self, source_directory: Path, destination_directory: Path, subdir: Path, file_options: FileOptions):
@@ -1237,7 +1238,7 @@ class Converter:
                                key = lambda filepath: self.interface_then_impl_key(filepath)):
             filename = filepath.relative_to(source_directory)
             if any_pattern_maches(self.options.skip_patterns, PurePosixPath(filename)):
-                print(f'skipping "{filename}"')
+                logging.info(f'skipping "{filename}"')
                 continue
             next_file_options = self.make_next_file_options(file_options, filename)
             if filepath.is_file():

@@ -33,21 +33,17 @@
 ## Current Issues (for AI to fix)
 
 ### Critical
-1. **Logging**: Using `print()` instead of `logging`
-   - Files: `cxx_modules_converter_lib.py:222, 242, 319, 762, 1178, 1181, 1223, 1226, 1229, 1240`
-   - Task: Replace with structured logging with levels
-
-2. **Error Handling**: `assert()` in production code
+1. **Error Handling**: `assert()` in production code
    - Files: `cxx_modules_converter.py:91, 142, 146` and `cxx_modules_converter_lib.py:216, 277, 622, 664, 665, 819, 954, 956, 961`
    - Task: Replace with explicit exceptions
 
-3. **Monolithic Code**: Single file with 1246 lines
+2. **Monolithic Code**: Single file with 1246 lines
    - Task: Split into modules (options.py, resolvers.py, builders.py, converter.py, utils.py)
 
 ### Architectural
-4. **Dependency Resolution**: Complex logic in `FilesResolver`
-5. **Module Building**: Multiple Builder classes with inheritance
-6. **Configuration**: `Options` class is too large
+3. **Dependency Resolution**: Complex logic in `FilesResolver`
+4. **Module Building**: Multiple Builder classes with inheritance
+5. **Configuration**: `Options` class is too large
 
 ## Recommendations for AI Working on the Project
 
@@ -66,6 +62,11 @@
    - Use type hints (already present)
    - Naming: snake_case for functions/variables, PascalCase for classes
    - Document public methods
+
+4. **Keep documentation current**
+   - Remove completed tasks from TODO.md and AGENTS.md instead of marking them as done
+   - Delete entire sections that are no longer relevant
+   - Update version numbers and dates when making significant changes
 
 ### When Adding Functionality
 1. **Extend, don't modify**
@@ -132,7 +133,6 @@ converter.convert_directory(input_path, output_path)
 ## Improvement Paths (for AI Agents)
 
 ### Low-level Tasks
-- [ ] Replace `print()` with `logging` in all files
 - [ ] Create `exceptions.py` with custom exceptions
 - [ ] Split `cxx_modules_converter_lib.py` into modules
 
@@ -189,4 +189,4 @@ mypy cxx_modules_converter.py cxx_modules_converter_lib.py
 
 ---
 *Document created to assist AI agents in understanding and improving the project*
-*Version: 1.1 | Date: 2026-05-10 | Status: Current*
+*Version: 1.2 | Date: 2026-05-11 | Status: Current*
