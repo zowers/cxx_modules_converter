@@ -167,6 +167,25 @@ python cxx_modules_converter.py -s test_data/simple/input -d output
 mypy cxx_modules_converter.py cxx_modules_converter_lib
 ```
 
+### Code Quality Tools
+```bash
+# Format code with black (preserves single quotes)
+python -m black .
+
+# Sort imports with isort
+python -m isort . --profile black
+
+# Lint with flake8
+python -m flake8 .
+
+# Remove unused imports
+python -m autoflake --in-place --remove-all-unused-imports cxx_modules_converter_lib/*.py
+
+# Pre-commit hooks (install first: pip install pre-commit)
+pre-commit install    # Install hooks
+pre-commit run --all-files  # Run on all files
+```
+
 ## Contacts and Resources
 
 - **Author**: Alexander Petrov (zowers@zowers.net)
@@ -180,8 +199,9 @@ mypy cxx_modules_converter.py cxx_modules_converter_lib
 2. **Test**: Ensure tests pass after changes
 3. **Document**: Explain what and why was changed
 4. **Follow the plan**: See TODO.md for priorities and timelines
-5. **Use English**: Ensure all changes maintain English-only policy
+5. **Story management**: All improvement stories are stored in TODO.md. New stories should be added at the end of the "Stories" section, before "Implementation Recommendations".
+6. **Use English**: Ensure all changes maintain English-only policy
 
 ---
 *Document created to assist AI agents in understanding and improving the project*
-*Version: 1.5 | Date: 2026-05-12 | Status: Current*
+*Version: 1.6 | Date: 2026-05-12 | Status: Current*

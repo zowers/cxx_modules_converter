@@ -1,29 +1,29 @@
 from __future__ import annotations
 
-from .options import (
-    ConvertAction,
-    ContentType,
-    Options,
-    FileOptions,
-    FileEntryType,
-    COMPAT_MACRO_DEFAULT,
-    always_include_names,
-)
-from .resolvers import FilesResolver, ModuleFilesResolver, FilesMap
-from .file_processing import FileContent, Matcher, HeaderScanState, LineCompatibility
-from .file_base_builder import FileBaseBuilder, FileProcessingState
-from .module_base_builder import ModuleBaseBuilder, any_pattern_maches
-from .module_interface_builder import ModuleInterfaceUnitBuilder
-from .module_impl_builder import ModuleImplUnitBuilder
 from .compat_header_builder import CompatHeaderBuilder
-from .converter import Converter, convert_file_content, find_cycles, convert_directory
+from .converter import Converter, convert_directory, convert_file_content, find_cycles
 from .exceptions import (
-    CxxModulesConverterError,
     ConfigurationError,
     ConversionError,
+    CxxModulesConverterError,
     FileSystemError,
     ValidationError,
 )
+from .file_base_builder import FileBaseBuilder, FileProcessingState
+from .file_processing import FileContent, HeaderScanState, LineCompatibility, Matcher
+from .module_base_builder import ModuleBaseBuilder, any_pattern_maches
+from .module_impl_builder import ModuleImplUnitBuilder
+from .module_interface_builder import ModuleInterfaceUnitBuilder
+from .options import (
+    COMPAT_MACRO_DEFAULT,
+    ContentType,
+    ConvertAction,
+    FileEntryType,
+    FileOptions,
+    Options,
+    always_include_names,
+)
+from .resolvers import FilesMap, FilesResolver, ModuleFilesResolver
 
 __all__ = [
     'ConvertAction',

@@ -4,6 +4,8 @@
 This document contains an improvement plan for the `cxx_modules_converter` project - a tool for converting C++ headers to C++20 modules and vice versa.
 
 ## Stories
+*Note: All improvement stories are listed here. New stories should be added at the end of this section, before "Implementation Recommendations".*
+
 ### MOD-1000: Improve Documentation (Medium)
 **Problem**: Incomplete API documentation.
 
@@ -23,21 +25,6 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Validate patterns for skip/compat/header
 - [ ] Add warnings about potential issues
 - [ ] Create configuration validation utility
-
-### MOD-1002: Code Formatting and Style Enforcement (Medium)
-**Problem**: Inconsistent code style across the codebase.
-
-**Tasks:**
-- [ ] Apply `black` formatter to all Python files
-- [ ] Apply `isort` for consistent import ordering
-- [ ] Add `flake8` linting with project-specific configuration
-- [ ] Create pre-commit hooks for automatic formatting
-- [ ] Add CI check for code style compliance
-
-**Files to format:**
-- `cxx_modules_converter.py`
-- All files in `cxx_modules_converter_lib/` directory
-
 
 ### MOD-1003: Performance Optimization (Long)
 **Problem**: Repeated file reading and writing.
@@ -78,6 +65,16 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Set up automated testing for different Python versions (3.10+)
 - [ ] Add performance tests
 - [ ] Set up automatic deployment to PyPI
+
+### MOD-1007: Enhance Code Quality Automation (Medium)
+**Problem**: Code quality tools need further integration and improvement.
+
+**Tasks:**
+- [ ] Add type checking (mypy) to pre-commit hooks
+- [ ] Configure flake8 to ignore specific non-critical errors
+- [ ] Add security linting (bandit) for potential vulnerabilities
+- [ ] Integrate code coverage reporting (coverage.py) with pre-commit
+- [ ] Create script to automatically fix common issues (autoflake, black, isort)
 
 ## Implementation Recommendations
 
@@ -154,4 +151,4 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ---
 *Last updated: 2026-05-12*
-*Document version: 1.3*
+*Document version: 1.4*

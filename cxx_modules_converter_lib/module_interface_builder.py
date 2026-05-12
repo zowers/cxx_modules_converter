@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from .options import Options, FileOptions, ContentType
-from .resolvers import FilesResolver
 from .module_base_builder import ModuleBaseBuilder
+from .options import ContentType, FileOptions, Options
+from .resolvers import FilesResolver
 
 
 class ModuleInterfaceUnitBuilder(ModuleBaseBuilder):
@@ -28,7 +28,12 @@ class ModuleInterfaceUnitBuilder(ModuleBaseBuilder):
     '''
     module_purview_start_prefix: str = 'export module'
 
-    def __init__(self, options: Options, parent_resolver: FilesResolver, file_options: FileOptions):
+    def __init__(
+        self,
+        options: Options,
+        parent_resolver: FilesResolver,
+        file_options: FileOptions,
+    ):
         super().__init__(options, parent_resolver, file_options)
         self.partitions: list[ModuleInterfaceUnitBuilder] = []
 

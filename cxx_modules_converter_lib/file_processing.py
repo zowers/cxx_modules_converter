@@ -24,14 +24,18 @@ content_type_to_converted: ContentTypeToConverted = {
     ContentType.MODULE_IMPL: ContentType.CXX,
 }
 
-interface_content_types: set[ContentType] = {ContentType.MODULE_INTERFACE, ContentType.HEADER}
+interface_content_types: set[ContentType] = {
+    ContentType.MODULE_INTERFACE,
+    ContentType.HEADER,
+}
+
 
 def get_converted_content_type(content_type: ContentType) -> ContentType:
     return content_type_to_converted[content_type]
 
 
 class FileContent:
-    def __init__(self, filename: str|Path, content_type: ContentType, content: str):
+    def __init__(self, filename: str | Path, content_type: ContentType, content: str):
         self.filename: Path = Path(filename)
         self.content_type: ContentType = content_type
         self.content: str = content
@@ -41,6 +45,7 @@ class FileContent:
 
     def __eq__(self, other: object):
         return self.__dict__ == other.__dict__
+
 
 FileContentList: TypeAlias = list[FileContent]
 StrList: TypeAlias = list[str]

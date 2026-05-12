@@ -9,12 +9,14 @@ from typing import TypeAlias
 # Re-exported from exceptions module
 from .exceptions import ValidationError
 
+
 class ConvertAction(enum.Enum):
     MODULES = 'modules'
     HEADERS = 'headers'
 
     def __str__(self) -> str:
         return self.value
+
 
 AlwaysIncludeNames: TypeAlias = list[str]
 always_include_names: AlwaysIncludeNames = [
@@ -141,6 +143,7 @@ STD_MODULE_PATHS = [
     # 'version',
 ]
 
+
 class ContentType(enum.IntEnum):
     HEADER = 1
     CXX = 2
@@ -148,8 +151,10 @@ class ContentType(enum.IntEnum):
     MODULE_IMPL = 4
     OTHER = 5
 
+
 ExtTypes: TypeAlias = dict[str, ContentType]
 ContentTypeToExt: TypeAlias = dict[ContentType, str]
+
 
 class Options:
     def __init__(self):
@@ -179,7 +184,7 @@ class Options:
             ContentType.MODULE_IMPL: '.cpp',
         }
         self.path_to_module_prefix_map: dict[PurePosixPath, str] = {}
-        self.join_configurations: dict[str, str] = {} # pattern -> target_module
+        self.join_configurations: dict[str, str] = {}  # pattern -> target_module
 
     def add_export_module(self, owner: str, export: str):
         owner_exports = self.export.setdefault(owner, set())
@@ -219,7 +224,9 @@ class Options:
     def add_modules_path(self, module_prefix: str, pathStr: str):
         path = PurePosixPath(pathStr)
         if path in self.path_to_module_prefix_map:
-            logging.warning(f'path {path} already mapped to module prefix {self.path_to_module_prefix_map[path]}')
+            logging.warning(
+                f'path {path} already mapped to module prefix {self.path_to_module_prefix_map[path]}'  # noqa: E501
+            )
             return
         self.path_to_module_prefix_map[path] = module_prefix
 
@@ -236,19 +243,24 @@ class Options:
     def add_std_compat_module(self):
         for path in STD_MODULE_PATHS:
             self.add_modules_path(STD_COMPAT_MODULE, path)
-    
+
     def add_join_configuration(self, target_module: str, pattern: str):
         if pattern in self.join_configurations:
-            logging.warning(f'pattern "{pattern}" already mapped to target module "{self.join_configurations[pattern]}"')
+            logging.warning(
+                f'pattern "{pattern}" already mapped to target module "{self.join_configurations[pattern]}"'  # noqa: E501
+            )
             return
         self.join_configurations[pattern] = target_module
+
 
 class FileOptions:
     def __init__(self):
         self.convert_as_compat: bool = False
 
+
 class FileEntryType(enum.IntEnum):
     FILE = 1
     DIR = 2
+
 
 FilesMapDict: TypeAlias = dict[str, "FilesMapDict | FileEntryType"]

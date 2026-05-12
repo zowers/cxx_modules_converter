@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from .options import Options, FileOptions, ContentType
-from .resolvers import FilesResolver
 from .module_base_builder import ModuleBaseBuilder
 from .module_interface_builder import ModuleInterfaceUnitBuilder
+from .options import ContentType, FileOptions, Options
+from .resolvers import FilesResolver
 
 
 class ModuleImplUnitBuilder(ModuleBaseBuilder):
@@ -25,7 +25,12 @@ module <name>;             // Start of module purview.
     '''
     module_purview_start_prefix: str = 'module'
 
-    def __init__(self, options: Options, parent_resolver: FilesResolver, file_options: FileOptions):
+    def __init__(
+        self,
+        options: Options,
+        parent_resolver: FilesResolver,
+        file_options: FileOptions,
+    ):
         super().__init__(options, parent_resolver, file_options)
         self._is_actually_module = False
         self.module_interface_builder: ModuleInterfaceUnitBuilder | None = None
@@ -40,5 +45,7 @@ module <name>;             // Start of module purview.
     def get_module_interface_builder(self) -> ModuleInterfaceUnitBuilder | None:
         return self.module_interface_builder
 
-    def set_module_interface_builder(self, module_interface_builder: ModuleInterfaceUnitBuilder | None):
+    def set_module_interface_builder(
+        self, module_interface_builder: ModuleInterfaceUnitBuilder | None
+    ):
         self.module_interface_builder = module_interface_builder

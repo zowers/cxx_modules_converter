@@ -39,7 +39,7 @@ build_project() {
     local module_path_flag=""
     local source_compile_flags=""
     local module_output_dir="build"
-    
+
     # Select compiler and specific options based on preset
     case $preset in
         test-clang-20)
@@ -72,20 +72,20 @@ build_project() {
             exit 1
             ;;
     esac
-    
+
     # Check compiler availability
     if ! check_compiler "$compiler"; then
         exit 1
     fi
-    
+
     echo "Building project with preset: $preset"
     echo "  Compiler: $compiler"
     echo "  Module flag: $module_compile_flag"
     echo "  Output extension: $module_output_ext"
-    
+
     # Create build directory
     rm -rf build gcm.cache && mkdir -p build $module_output_dir
-    
+
     # Compile module partitions
     echo "Compiling module partitions..."
     $compiler -std=gnu++23 $module_compile_flag mymodule/part1.cppm -o $module_output_dir/mymodule-part1.$module_output_ext
@@ -93,13 +93,13 @@ build_project() {
         echo "Error compiling partition mymodule:part1"
         exit 1
     fi
-    
+
     $compiler -std=gnu++23 $module_compile_flag mymodule/part2.cppm -o $module_output_dir/mymodule-part2.$module_output_ext
     if [ $? -ne 0 ]; then
         echo "Error compiling partition mymodule:part2"
         exit 1
     fi
-    
+
     # Compile main module with path to partitions
     echo "Compiling main module..."
     $compiler -std=gnu++23 $module_path_flag $module_compile_flag mymodule.cppm -o $module_output_dir/mymodule.$module_output_ext
@@ -107,7 +107,7 @@ build_project() {
         echo "Error compiling main module mymodule"
         exit 1
     fi
-    
+
     # Compile source files using modules
     echo "Compiling source files..."
     $compiler -std=gnu++23 $source_compile_flags mymodule/part1.cpp -o build/part1.o
@@ -115,19 +115,19 @@ build_project() {
         echo "Error compiling part1.cpp"
         exit 1
     fi
-    
+
     $compiler -std=gnu++23 $source_compile_flags mymodule/part2.cpp -o build/part2.o
     if [ $? -ne 0 ]; then
         echo "Error compiling part2.cpp"
         exit 1
     fi
-    
+
     $compiler -std=gnu++23 $source_compile_flags main.cpp -o build/main.o
     if [ $? -ne 0 ]; then
         echo "Error compiling main.cpp"
         exit 1
     fi
-    
+
     # Link object files
     echo "Linking..."
     $compiler -std=gnu++23 -o build/test_mod build/main.o build/part1.o build/part2.o
@@ -148,9 +148,9 @@ main() {
         show_help
         exit 1
     fi
-    
+
     local preset=$1
-    
+
     # Process command line arguments
     case $preset in
         -h|--help)
