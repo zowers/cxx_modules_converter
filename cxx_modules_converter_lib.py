@@ -214,7 +214,8 @@ class Options:
     def set_output_content_type_to_ext(self, type: ContentType, ext: str):
         if not ext.startswith('.'):
             ext = '.' + ext
-        assert(ext != '.')
+        if ext == '.':
+            raise ValidationError("Extension cannot be empty or just a dot")
         self.content_type_to_ext[type] = ext
 
     def add_modules_path(self, module_prefix: str, pathStr: str):
@@ -275,7 +276,8 @@ class FilesMap:
                 root_node: FilesMapDict = self.value
             else:
                 parent_node = self.find(PurePosixPath(relative_root.parent))
-                assert(type(parent_node) is dict)
+                if not isinstance(parent_node, dict):
+                    raise RuntimeError(f"Expected dict for parent node, got {type(parent_node).__name__}")
                 root_node = parent_node[relative_root.name] = {}
 
             for name in dirs:
@@ -620,7 +622,8 @@ class ModuleBaseBuilder(FileBaseBuilder):
         module_name = self.parent_resolver.make_defined_module_for_path(pure_source_filename)
         if not module_name:
             module_name = self.parent_resolver.convert_filename_to_module_name(pure_source_filename)
-        assert(module_name)
+        if not module_name:
+            raise ConversionError(f"Failed to determine module name for file {pure_source_filename}")
         self.set_module_name(module_name)
 
     def set_module_name(self, name: str):
@@ -662,8 +665,10 @@ class ModuleBaseBuilder(FileBaseBuilder):
             return
         if not self.get_is_actually_module():
             return
-        assert(self.module_purview_start_prefix)
-        assert(self.module_name)
+        if not self.module_purview_start_prefix:
+            raise ConversionError("module_purview_start_prefix is not set")
+        if not self.module_name:
+            raise ConversionError("module_name is not set")
         module_purview_start = f'''{self.module_purview_start_prefix} {self.module_name};'''
         self.module_purview_start = self.wrap_in_compat_macro_if_compat_header([
             module_purview_start
@@ -952,14 +957,17 @@ class CompatHeaderBuilder(FileBaseBuilder):
     def __init__(self, options: Options, module_builder: ModuleBaseBuilder):
         super().__init__(options, module_builder.parent_resolver)
         self.module_builder: ModuleBaseBuilder = module_builder
-        assert(module_builder.content_type == ContentType.MODULE_INTERFACE)
+        if module_builder.content_type != ContentType.MODULE_INTERFACE:
+            raise ConfigurationError(f"CompatHeaderBuilder requires MODULE_INTERFACE builder, got {module_builder.content_type}")
         module_interface_unit_filename: str = module_builder.converted_filename()
-        assert(module_interface_unit_filename)
+        if not module_interface_unit_filename:
+            raise ConfigurationError("module_interface_unit_filename is empty")
         self.relative_module_interface_unit_filename: str = os.path.basename(module_interface_unit_filename)
 
     def build_result(self) -> str:
         compat_macro = self.options.compat_macro
-        assert(compat_macro)
+        if not compat_macro:
+            raise ConfigurationError("compat_macro is not set in options")
         relative_module_interface_unit_filename = self.relative_module_interface_unit_filename
         parts = [
             f'''#pragma once''',
@@ -1318,3 +1326,28 @@ def find_cycles(dependencies: dict[str, set[str]]) -> list[list[str]]:
 def convert_directory(action: ConvertAction, source_directory: Path, destination_directory: Path, subdir: str | None = None):
     converter = Converter(action)
     return converter.convert_directory(source_directory, destination_directory)
+
+
+class CxxModulesConverterError(Exception):
+    """Base exception for all cxx_modules_converter errors."""
+    pass
+
+
+class ConfigurationError(CxxModulesConverterError):
+    """Raised when there is a configuration error."""
+    pass
+
+
+class ConversionError(CxxModulesConverterError):
+    """Raised when a conversion error occurs."""
+    pass
+
+
+class FileSystemError(CxxModulesConverterError):
+    """Raised when a file system operation fails."""
+    pass
+
+
+class ValidationError(CxxModulesConverterError):
+    """Raised when input validation fails."""
+    pass

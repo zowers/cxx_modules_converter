@@ -5,32 +5,7 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ## Priority 1: Immediate Improvements
 
-### 1.2. Improve Error Handling
-**Problem**: Multiple `assert()` statements without exception handling in production code.
-
-**Tasks:**
-- [ ] Replace `assert()` with explicit checks and exceptions
-- [ ] Create custom exceptions:
-  - `ConfigurationError` - configuration errors
-  - `ConversionError` - conversion errors
-  - `FileSystemError` - file system operation errors
-- [ ] Add exception handling in CLI with clear messages
-
-**Files to modify:**
-- [`cxx_modules_converter.py:91`](cxx_modules_converter.py:91) - `assert(destination != parsed_args.directory)`
-- [`cxx_modules_converter.py:142`](cxx_modules_converter.py:142) - `assert(not parsed_args.modulestdcompat)`
-- [`cxx_modules_converter.py:146`](cxx_modules_converter.py:146) - `assert(not parsed_args.modulestd)`
-- [`cxx_modules_converter_lib.py:216`](cxx_modules_converter_lib.py:216) - `assert(ext != '.')`
-- [`cxx_modules_converter_lib.py:277`](cxx_modules_converter_lib.py:277) - `assert(type(parent_node) is dict)`
-- [`cxx_modules_converter_lib.py:622`](cxx_modules_converter_lib.py:622) - `assert(module_name)`
-- [`cxx_modules_converter_lib.py:664`](cxx_modules_converter_lib.py:664) - `assert(self.module_purview_start_prefix)`
-- [`cxx_modules_converter_lib.py:665`](cxx_modules_converter_lib.py:665) - `assert(self.module_name)`
-- [`cxx_modules_converter_lib.py:819`](cxx_modules_converter_lib.py:819) - `assert(bool(self.global_module_fragment_start)...)`
-- [`cxx_modules_converter_lib.py:954`](cxx_modules_converter_lib.py:954) - `assert(module_builder.content_type == ContentType.MODULE_INTERFACE)`
-- [`cxx_modules_converter_lib.py:956`](cxx_modules_converter_lib.py:956) - `assert(module_interface_unit_filename)`
-- [`cxx_modules_converter_lib.py:961`](cxx_modules_converter_lib.py:961) - `assert(compat_macro)`
-
-### 1.3. Refactor Large Files
+### 1.2. Refactor Large Files
 **Problem**: Large monolithic file `cxx_modules_converter_lib.py` (1246 lines).
 
 **Tasks:**
@@ -221,5 +196,5 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [PyPI page](https://pypi.org/project/cxx-modules-converter/)
 
 ---
-*Last updated: 2026-05-10*
-*Document version: 1.0*
+*Last updated: 2026-05-12*
+*Document version: 1.1*

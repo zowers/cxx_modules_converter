@@ -33,17 +33,13 @@
 ## Current Issues (for AI to fix)
 
 ### Critical
-1. **Error Handling**: `assert()` in production code
-   - Files: `cxx_modules_converter.py:91, 142, 146` and `cxx_modules_converter_lib.py:216, 277, 622, 664, 665, 819, 954, 956, 961`
-   - Task: Replace with explicit exceptions
-
-2. **Monolithic Code**: Single file with 1246 lines
+1. **Monolithic Code**: Single file with 1246 lines
    - Task: Split into modules (options.py, resolvers.py, builders.py, converter.py, utils.py)
 
 ### Architectural
-3. **Dependency Resolution**: Complex logic in `FilesResolver`
-4. **Module Building**: Multiple Builder classes with inheritance
-5. **Configuration**: `Options` class is too large
+2. **Dependency Resolution**: Complex logic in `FilesResolver`
+3. **Module Building**: Multiple Builder classes with inheritance
+4. **Configuration**: `Options` class is too large
 
 ## Recommendations for AI Working on the Project
 
@@ -189,4 +185,4 @@ mypy cxx_modules_converter.py cxx_modules_converter_lib.py
 
 ---
 *Document created to assist AI agents in understanding and improving the project*
-*Version: 1.2 | Date: 2026-05-11 | Status: Current*
+*Version: 1.3 | Date: 2026-05-12 | Status: Current*

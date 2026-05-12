@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 
 from cxx_modules_converter_lib import (
-    Converter, 
+    Converter,
     ConvertAction,
     COMPAT_MACRO_DEFAULT,
     always_include_names,
@@ -91,78 +91,85 @@ def main():
     if not parsed_args.directory:
         logger.error('--directory argument is required')
         return 1
-    log_messages: list[str] = []
-    log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {"inplace" if parsed_args.inplace else " into " + parsed_args.destination}')
-    if parsed_args.inplace:
-        destination = parsed_args.directory
-    else:
-        destination = parsed_args.destination
-        assert(destination != parsed_args.directory)
-    path = Path(parsed_args.directory)
-    converter = Converter(parsed_args.action)
-    if parsed_args.parent:
-        parsed_args.root = path.parent
-    if parsed_args.root:
-        root_dir = Path(parsed_args.root)
-        converter.options.root_dir = root_dir
-    else:
-        converter.options.root_dir = path
-    converter.options.set_root_dir_module_name(parsed_args.name)
-    for include in parsed_args.include:
-        log_messages.append(f'include search path: "{include}"')
-        converter.options.search_path.append(include)
-    for skip_pattern in parsed_args.skip:
-        log_messages.append(f'skip pattern: "{skip_pattern}"')
-        converter.options.skip_patterns.append(skip_pattern)
-    for compat_pattern in parsed_args.compat:
-        log_messages.append(f'compat pattern: "{compat_pattern}"')
-        converter.options.compat_patterns.append(compat_pattern)
-    if parsed_args.compat_macro:
-        converter.options.compat_macro = parsed_args.compat_macro
-    for header in parsed_args.header:
-        log_messages.append(f'header: "{header}"')
-        converter.options.always_include_names.append(header)
-    for export_pair in parsed_args.export:
-        owner, export = export_pair.split('=')
-        log_messages.append(f'export: "{owner}" exports "{export}"')
-        converter.options.add_export_module(owner, export)
-    for export_suffix in parsed_args.exportsuffix:
-        log_messages.append(f'export suffix: "{export_suffix}"')
-        converter.options.export_suffixes.append(export_suffix)
-    for ext in parsed_args.inextheader:
-        log_messages.append(f'input header extension: "{ext}"')
-        converter.options.add_module_action_ext_type(ext, ContentType.HEADER)
-    for ext in parsed_args.inextcxx:
-        log_messages.append(f'input C++ source extension: "{ext}"')
-        converter.options.add_module_action_ext_type(ext, ContentType.CXX)
-    if parsed_args.outextmod:
-        ext = parsed_args.outextmod
-        log_messages.append(f'output module interface unit extension: "{ext}"')
-        converter.options.set_output_content_type_to_ext(ContentType.MODULE_INTERFACE, ext)
-    if parsed_args.outextmodimpl:
-        ext = parsed_args.outextmodimpl
-        log_messages.append(f'output module implementation unit extension: "{ext}"')
-        converter.options.set_output_content_type_to_ext(ContentType.MODULE_IMPL, ext)
-    for modules_pair in parsed_args.modules:
-        module_prefix, path = modules_pair.split('=')
-        log_messages.append(f'module prefix: "{module_prefix}" in path "{path}"')
-        converter.options.add_modules_path(module_prefix, path)
-    if parsed_args.modulestd:
-        assert(not parsed_args.modulestdcompat)
-        log_messages.append(f'module std: "std"')
-        converter.options.add_std_module()
-    if parsed_args.modulestdcompat:
-        assert(not parsed_args.modulestd)
-        log_messages.append(f'module std.compat: "std.compat"')
-        converter.options.add_std_compat_module()
-    for join_pair in parsed_args.join:
-        target_module, pattern = join_pair.split('=', 1)
-        log_messages.append(f'join: "{target_module}" from pattern "{pattern}"')
-        converter.options.add_join_configuration(target_module, pattern)
-    log_text = '\n'.join(log_messages)
-    logger.info(log_text)
-    converter.convert_directory(path, Path(destination))
-    logger.info(f'done, all: {converter.all_files}, convertable: {converter.convertable_files}, converted: {converter.converted_files}, copied: {converter.copied_files}')
+    try:
+        log_messages: list[str] = []
+        log_messages.append(f'converting files of directory "{parsed_args.directory}" to {parsed_args.action} {"inplace" if parsed_args.inplace else " into " + parsed_args.destination}')
+        if parsed_args.inplace:
+            destination = parsed_args.directory
+        else:
+            destination = parsed_args.destination
+            if destination == parsed_args.directory:
+                raise ValueError("Destination directory must be different from source directory when not using --inplace")
+        path = Path(parsed_args.directory)
+        converter = Converter(parsed_args.action)
+        if parsed_args.parent:
+            parsed_args.root = path.parent
+        if parsed_args.root:
+            root_dir = Path(parsed_args.root)
+            converter.options.root_dir = root_dir
+        else:
+            converter.options.root_dir = path
+        converter.options.set_root_dir_module_name(parsed_args.name)
+        for include in parsed_args.include:
+            log_messages.append(f'include search path: "{include}"')
+            converter.options.search_path.append(include)
+        for skip_pattern in parsed_args.skip:
+            log_messages.append(f'skip pattern: "{skip_pattern}"')
+            converter.options.skip_patterns.append(skip_pattern)
+        for compat_pattern in parsed_args.compat:
+            log_messages.append(f'compat pattern: "{compat_pattern}"')
+            converter.options.compat_patterns.append(compat_pattern)
+        if parsed_args.compat_macro:
+            converter.options.compat_macro = parsed_args.compat_macro
+        for header in parsed_args.header:
+            log_messages.append(f'header: "{header}"')
+            converter.options.always_include_names.append(header)
+        for export_pair in parsed_args.export:
+            owner, export = export_pair.split('=')
+            log_messages.append(f'export: "{owner}" exports "{export}"')
+            converter.options.add_export_module(owner, export)
+        for export_suffix in parsed_args.exportsuffix:
+            log_messages.append(f'export suffix: "{export_suffix}"')
+            converter.options.export_suffixes.append(export_suffix)
+        for ext in parsed_args.inextheader:
+            log_messages.append(f'input header extension: "{ext}"')
+            converter.options.add_module_action_ext_type(ext, ContentType.HEADER)
+        for ext in parsed_args.inextcxx:
+            log_messages.append(f'input C++ source extension: "{ext}"')
+            converter.options.add_module_action_ext_type(ext, ContentType.CXX)
+        if parsed_args.outextmod:
+            ext = parsed_args.outextmod
+            log_messages.append(f'output module interface unit extension: "{ext}"')
+            converter.options.set_output_content_type_to_ext(ContentType.MODULE_INTERFACE, ext)
+        if parsed_args.outextmodimpl:
+            ext = parsed_args.outextmodimpl
+            log_messages.append(f'output module implementation unit extension: "{ext}"')
+            converter.options.set_output_content_type_to_ext(ContentType.MODULE_IMPL, ext)
+        for modules_pair in parsed_args.modules:
+            module_prefix, path = modules_pair.split('=')
+            log_messages.append(f'module prefix: "{module_prefix}" in path "{path}"')
+            converter.options.add_modules_path(module_prefix, path)
+        if parsed_args.modulestd:
+            if parsed_args.modulestdcompat:
+                raise ValueError("Cannot use both --modulestd and --modulestdcompat")
+            log_messages.append(f'module std: "std"')
+            converter.options.add_std_module()
+        if parsed_args.modulestdcompat:
+            if parsed_args.modulestd:
+                raise ValueError("Cannot use both --modulestd and --modulestdcompat")
+            log_messages.append(f'module std.compat: "std.compat"')
+            converter.options.add_std_compat_module()
+        for join_pair in parsed_args.join:
+            target_module, pattern = join_pair.split('=', 1)
+            log_messages.append(f'join: "{target_module}" from pattern "{pattern}"')
+            converter.options.add_join_configuration(target_module, pattern)
+        log_text = '\n'.join(log_messages)
+        logger.info(log_text)
+        converter.convert_directory(path, Path(destination))
+        logger.info(f'done, all: {converter.all_files}, convertable: {converter.convertable_files}, converted: {converter.converted_files}, copied: {converter.copied_files}')
+    except Exception as e:
+        logger.error(f'Error: {e}')
+        return 1
 
 if __name__ == '__main__':
     sys.exit(main())
