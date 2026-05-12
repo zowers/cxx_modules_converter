@@ -5,15 +5,6 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ## Priority 2: Medium-term Improvements
 
-### 2.1. Reorganize Tests
-**Problem**: Very large test file `cxx_modules_converter_lib_test.py` (1806 lines).
-
-**Tasks:**
-- [ ] Split test file into modular tests using suffix `_test.py` (e.g., `converter_test.py`, `options_test.py`) placed next to the tested file/class within the `cxx_modules_converter_lib/` directory.
-- [ ] Do not create a separate `tests/` directory; keep tests adjacent to source code.
-- [ ] Group tests by functionality (each test file corresponds to a specific module).
-- [ ] Add parameterized tests for edge cases coverage.
-
 ### 2.2. Improve Documentation
 **Problem**: Incomplete API documentation.
 
@@ -47,7 +38,6 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 **Files to format:**
 - `cxx_modules_converter.py`
 - All files in `cxx_modules_converter_lib/` directory
-- `cxx_modules_converter_lib_test.py`
 
 ## Priority 3: Long-term Improvements
 
@@ -166,4 +156,4 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ---
 *Last updated: 2026-05-12*
-*Document version: 1.2*
+*Document version: 1.3*

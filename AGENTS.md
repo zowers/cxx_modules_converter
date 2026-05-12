@@ -27,8 +27,9 @@
    - `__init__.py` - public API exports
 
 3. **Test Infrastructure**
-   - `cxx_modules_converter_lib_test.py` - unit tests
+   - Modular test files with `_test.py` suffix placed next to source code
    - `test_data/` - test data with input/expected structure
+   - Test files: `module_base_builder_test.py`, `converter_test.py`, `resolvers_test.py`, etc.
 
 ### Key Concepts
 
@@ -148,7 +149,7 @@ converter.convert_directory(input_path, output_path)
 pytest -vv
 
 # Run specific test
-pytest cxx_modules_converter_lib_test.py::test_module_empty -vv
+pytest cxx_modules_converter_lib/module_base_builder_test.py::test_module_empty -vv
 
 # Run with coverage
 pytest --cov=cxx_modules_converter_lib --cov-report=html
@@ -183,4 +184,4 @@ mypy cxx_modules_converter.py cxx_modules_converter_lib
 
 ---
 *Document created to assist AI agents in understanding and improving the project*
-*Version: 1.4 | Date: 2026-05-12 | Status: Current*
+*Version: 1.5 | Date: 2026-05-12 | Status: Current*
