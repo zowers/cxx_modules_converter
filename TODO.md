@@ -9,19 +9,10 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 **Problem**: Very large test file `cxx_modules_converter_lib_test.py` (1806 lines).
 
 **Tasks:**
-- [ ] Split test file into modular tests:
-  ```
-  tests/
-  ├── __init__.py
-  ├── test_options.py
-  ├── test_resolvers.py
-  ├── test_builders.py
-  ├── test_converter.py
-  ├── test_integration.py
-  └── conftest.py        # Common fixtures
-  ```
-- [ ] Group tests by functionality
-- [ ] Add parameterized tests for edge cases coverage
+- [ ] Split test file into modular tests using suffix `_test.py` (e.g., `converter_test.py`, `options_test.py`) placed next to the tested file/class within the `cxx_modules_converter_lib/` directory.
+- [ ] Do not create a separate `tests/` directory; keep tests adjacent to source code.
+- [ ] Group tests by functionality (each test file corresponds to a specific module).
+- [ ] Add parameterized tests for edge cases coverage.
 
 ### 2.2. Improve Documentation
 **Problem**: Incomplete API documentation.
