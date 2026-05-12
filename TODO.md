@@ -3,9 +3,8 @@
 ## Overview
 This document contains an improvement plan for the `cxx_modules_converter` project - a tool for converting C++ headers to C++20 modules and vice versa.
 
-## Priority 2: Medium-term Improvements
-
-### 2.2. Improve Documentation
+## Stories
+### MOD-1000: Improve Documentation (Medium)
 **Problem**: Incomplete API documentation.
 
 **Tasks:**
@@ -15,7 +14,7 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Update README.md with links to documentation
 - [ ] Add docstrings for all public classes and methods
 
-### 2.3. Add Configuration Validation
+### MOD-1001: Add Configuration Validation (Medium)
 **Problem**: Lack of input parameter validation.
 
 **Tasks:**
@@ -25,7 +24,7 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Add warnings about potential issues
 - [ ] Create configuration validation utility
 
-### 2.4. Code Formatting and Style Enforcement
+### MOD-1002: Code Formatting and Style Enforcement (Medium)
 **Problem**: Inconsistent code style across the codebase.
 
 **Tasks:**
@@ -39,9 +38,8 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - `cxx_modules_converter.py`
 - All files in `cxx_modules_converter_lib/` directory
 
-## Priority 3: Long-term Improvements
 
-### 3.1. Performance Optimization
+### MOD-1003: Performance Optimization (Long)
 **Problem**: Repeated file reading and writing.
 
 **Tasks:**
@@ -51,7 +49,7 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Implement parallel file processing
 - [ ] Add progress bar for large projects
 
-### 3.2. Extend Functionality
+### MOD-1004: Extend Functionality (Long)
 **Problem**: Limited preprocessor directive support.
 
 **Tasks:**
@@ -61,7 +59,7 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Support C++23 modules
 - [ ] Add customization of transformations via config
 
-### 3.3. Improve UX
+### MOD-1005: Improve UX (Long)
 **Problem**: Basic command line interface.
 
 **Tasks:**
@@ -71,7 +69,7 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Create interactive mode for configuration
 - [ ] Add support for configuration files (JSON/YAML)
 
-### 3.4. CI/CD Improvements
+### MOD-1006: CI/CD Improvements (Long)
 **Problem**: Basic testing setup.
 
 **Tasks:**
