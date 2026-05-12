@@ -32,8 +32,30 @@ from .resolvers import FilesResolver
 
 
 class Converter:
+    """Main converter class that orchestrates conversion between headers and modules.
+
+    Attributes:
+        action (ConvertAction): Conversion direction (MODULES or HEADERS).
+        options (Options): Configuration options for the conversion.
+        resolver (FilesResolver): File resolver instance.
+        all_files (int): Total number of files processed.
+        convertable_files (int): Number of files that can be converted.
+        converted_files (int): Number of files successfully converted.
+        copied_files (int): Number of files copied unchanged.
+        module_interface_builders (dict[str, ModuleInterfaceUnitBuilder]):
+            Builders for module interface units.
+        joint_module_builders (dict[str, ModuleInterfaceUnitBuilder]):
+            Builders for joined modules.
+        module_dependencies (dict[str, set[str]]): Graph of module dependencies.
+        circular_dependencies (list[list[str]]): Detected circular dependency cycles.
+    """
 
     def __init__(self, action: ConvertAction):
+        """Initialize a converter with the given action.
+
+        Args:
+            action: Whether to convert to modules (MODULES) or to headers (HEADERS).
+        """
         self.action = action
         self.options = Options()
         self.resolver = FilesResolver(self.options)

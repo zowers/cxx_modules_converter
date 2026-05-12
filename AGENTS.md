@@ -54,6 +54,7 @@
    - Use type hints (already present)
    - Naming: snake_case for functions/variables, PascalCase for classes
    - Document public methods
+   - Use ordinary hyphen U+002d "-" (not U+2011 "‑") in all documentation and comments
 
 4. **Keep documentation current**
    - Remove completed tasks from TODO.md and AGENTS.md instead of marking them as done
@@ -185,4 +186,4 @@ pre-commit run --all-files  # Run on all files
 
 ---
 *Document created to assist AI agents in understanding and improving the project*
-*Version: 1.7 | Date: 2026-05-12 | Status: Current*
+*Version: 1.8 | Date: 2026-05-12 | Status: Current*

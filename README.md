@@ -61,7 +61,18 @@ The converter has several configurable assumptions:
 * header file path is used to determine module name by joining path parts with dots (`.`); same for c++ source files, but can be customized using `--join` option to combine multiple files into module partitions
 * system header includes using `#include <>` are moved to global module fragment, but standard library headers can be replaced with `import std;` using `--modulestd` or `import std.compat;` using `--modulestdcompat`
 
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+- [API Reference](docs/api.md) – detailed description of the library’s public classes and functions.
+- [Usage Examples](docs/usage_examples.md) – practical examples of using the CLI and library.
+- [Development Guide](docs/development.md) – for contributors (project structure, testing, code style).
+
+For a quick start, see the [Usage](#usage) section above.
+
 ## Tests
+
 [`pytest`](https://pytest.org/) is used to run tests.
 The `venv` can be used to create python3 virtual environment, assuming Linux and bash is used:
 ```bash

@@ -6,16 +6,6 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 ## Stories
 *Note: All improvement stories are listed here. New stories should be added at the end of this section, before "Implementation Recommendations".*
 
-### MOD-1000: Improve Documentation (Medium)
-**Problem**: Incomplete API documentation.
-
-**Tasks:**
-- [ ] Add API documentation with examples in `docs/api.md`
-- [ ] Create `docs/usage_examples.md` with usage examples
-- [ ] Add `docs/development.md` for developers
-- [ ] Update README.md with links to documentation
-- [ ] Add docstrings for all public classes and methods
-
 ### MOD-1001: Add Configuration Validation (Medium)
 **Problem**: Lack of input parameter validation.
 
@@ -171,4 +161,4 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ---
 *Last updated: 2026-05-12*
-*Document version: 1.6*
+*Document version: 1.8*
