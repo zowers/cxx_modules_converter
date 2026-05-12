@@ -3,27 +3,6 @@
 ## Overview
 This document contains an improvement plan for the `cxx_modules_converter` project - a tool for converting C++ headers to C++20 modules and vice versa.
 
-## Priority 1: Immediate Improvements
-
-### 1.2. Refactor Large Files
-**Problem**: Large monolithic file `cxx_modules_converter_lib.py` (1246 lines).
-
-**Tasks:**
-- [ ] Create module structure:
-  ```
-  cxx_modules_converter_lib/
-  ├── __init__.py
-  ├── options.py          # Options, FileOptions
-  ├── resolvers.py        # FilesResolver, ModuleFilesResolver
-  ├── builders.py         # All Builder classes
-  ├── converter.py        # Main Converter class
-  ├── utils.py           # Helper functions and constants
-  └── exceptions.py      # Custom exceptions
-  ```
-- [ ] Update imports in all files
-- [ ] Update tests for new structure
-- [ ] Update documentation
-
 ## Priority 2: Medium-term Improvements
 
 ### 2.1. Reorganize Tests
@@ -76,9 +55,8 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 **Files to format:**
 - `cxx_modules_converter.py`
-- `cxx_modules_converter_lib.py`
+- All files in `cxx_modules_converter_lib/` directory
 - `cxx_modules_converter_lib_test.py`
-- All new module files after refactoring
 
 ## Priority 3: Long-term Improvements
 
@@ -197,4 +175,4 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ---
 *Last updated: 2026-05-12*
-*Document version: 1.1*
+*Document version: 1.2*

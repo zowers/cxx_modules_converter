@@ -13,12 +13,18 @@
    - Conversion process coordination
    - Logging and statistics output
 
-2. **Core Library** (`cxx_modules_converter_lib.py`)
-   - `Converter` - main conversion class
-   - `Options` - conversion configuration
-   - `FilesResolver` - path and module resolution
-   - `ModuleBaseBuilder` and subclasses - module builders
-   - `FilesMap` - file map for searching
+2. **Core Library** (`cxx_modules_converter_lib/` module package)
+   - `converter.py` - `Converter` class, main conversion logic
+   - `options.py` - `Options`, `FileOptions`, `ConvertAction`, `ContentType`, constants
+   - `resolvers.py` - `FilesResolver`, `ModuleFilesResolver`, `FilesMap`
+   - `file_processing.py` - `FileContent`, `Matcher`, regular expressions, helper functions
+   - `file_base_builder.py` - `FileBaseBuilder`, `FileProcessingState`
+   - `module_base_builder.py` - `ModuleBaseBuilder`, `any_pattern_maches`
+   - `module_interface_builder.py` - `ModuleInterfaceUnitBuilder`
+   - `module_impl_builder.py` - `ModuleImplUnitBuilder`
+   - `compat_header_builder.py` - `CompatHeaderBuilder`
+   - `exceptions.py` - custom exception hierarchy
+   - `__init__.py` - public API exports
 
 3. **Test Infrastructure**
    - `cxx_modules_converter_lib_test.py` - unit tests
@@ -32,14 +38,10 @@
 
 ## Current Issues (for AI to fix)
 
-### Critical
-1. **Monolithic Code**: Single file with 1246 lines
-   - Task: Split into modules (options.py, resolvers.py, builders.py, converter.py, utils.py)
-
 ### Architectural
-2. **Dependency Resolution**: Complex logic in `FilesResolver`
-3. **Module Building**: Multiple Builder classes with inheritance
-4. **Configuration**: `Options` class is too large
+1. **Dependency Resolution**: Complex logic in `FilesResolver`
+2. **Module Building**: Multiple Builder classes with inheritance
+3. **Configuration**: `Options` class is too large
 
 ## Recommendations for AI Working on the Project
 
@@ -128,10 +130,6 @@ converter.convert_directory(input_path, output_path)
 
 ## Improvement Paths (for AI Agents)
 
-### Low-level Tasks
-- [ ] Create `exceptions.py` with custom exceptions
-- [ ] Split `cxx_modules_converter_lib.py` into modules
-
 ### Mid-level Tasks
 - [ ] Add caching for parsing results
 - [ ] Improve preprocessor directive handling
@@ -165,7 +163,7 @@ pip install -r requirements-test.txt
 python cxx_modules_converter.py -s test_data/simple/input -d output
 
 # Type checking
-mypy cxx_modules_converter.py cxx_modules_converter_lib.py
+mypy cxx_modules_converter.py cxx_modules_converter_lib
 ```
 
 ## Contacts and Resources
@@ -185,4 +183,4 @@ mypy cxx_modules_converter.py cxx_modules_converter_lib.py
 
 ---
 *Document created to assist AI agents in understanding and improving the project*
-*Version: 1.3 | Date: 2026-05-12 | Status: Current*
+*Version: 1.4 | Date: 2026-05-12 | Status: Current*
