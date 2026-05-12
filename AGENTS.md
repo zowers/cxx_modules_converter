@@ -37,13 +37,6 @@
 - **ConvertAction**: `MODULES` (headers → modules), `HEADERS` (modules → headers)
 - **Module naming**: paths converted to module names using dots (e.g., `subdir/file.h` → `subdir.file`)
 
-## Current Issues (for AI to fix)
-
-### Architectural
-1. **Dependency Resolution**: Complex logic in `FilesResolver`
-2. **Module Building**: Multiple Builder classes with inheritance
-3. **Configuration**: `Options` class is too large
-
 ## Recommendations for AI Working on the Project
 
 ### During Refactoring
@@ -129,18 +122,6 @@ converter.convert_directory(input_path, output_path)
 3. **Performance**: No caching, repeated file reads
 4. **Memory**: Loads all files into memory
 
-## Improvement Paths (for AI Agents)
-
-### Mid-level Tasks
-- [ ] Add caching for parsing results
-- [ ] Improve preprocessor directive handling
-- [ ] Add configuration validation
-
-### High-level Tasks
-- [ ] Implement incremental conversion
-- [ ] Add C++23 module support
-- [ ] Create plugin system
-
 ## Working Commands
 
 ### Testing
@@ -204,4 +185,4 @@ pre-commit run --all-files  # Run on all files
 
 ---
 *Document created to assist AI agents in understanding and improving the project*
-*Version: 1.6 | Date: 2026-05-12 | Status: Current*
+*Version: 1.7 | Date: 2026-05-12 | Status: Current*

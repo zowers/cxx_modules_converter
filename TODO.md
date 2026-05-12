@@ -76,6 +76,36 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Integrate code coverage reporting (coverage.py) with pre-commit
 - [ ] Create script to automatically fix common issues (autoflake, black, isort)
 
+### MOD-1008: Refactor Dependency Resolution (High)
+**Problem**: Complex logic in `FilesResolver` makes it difficult to maintain and extend.
+
+**Tasks:**
+- [ ] Analyze current dependency resolution algorithm
+- [ ] Simplify resolver logic by extracting helper functions
+- [ ] Improve error messages for circular dependencies
+- [ ] Add unit tests for edge cases
+- [ ] Document the resolution process
+
+### MOD-1009: Simplify Module Building Architecture (High)
+**Problem**: Multiple Builder classes with inheritance create tight coupling and reduce flexibility.
+
+**Tasks:**
+- [ ] Review Builder class hierarchy
+- [ ] Identify opportunities to replace inheritance with composition
+- [ ] Reduce duplication between `ModuleInterfaceUnitBuilder`, `ModuleImplUnitBuilder`, and `CompatHeaderBuilder`
+- [ ] Create a unified interface for builders
+- [ ] Update tests to reflect new architecture
+
+### MOD-1010: Reduce Options Class Complexity (High)
+**Problem**: `Options` class is too large and handles too many responsibilities.
+
+**Tasks:**
+- [ ] Split `Options` into smaller, focused classes (e.g., `ConversionOptions`, `FileOptions`, `OutputOptions`)
+- [ ] Move validation logic to separate validator classes
+- [ ] Improve default value management
+- [ ] Ensure backward compatibility through adapter pattern
+- [ ] Update all references to use new structure
+
 ## Implementation Recommendations
 
 ### Phase 1: Preparation (1-2 weeks)
@@ -151,4 +181,4 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ---
 *Last updated: 2026-05-12*
-*Document version: 1.4*
+*Document version: 1.5*
