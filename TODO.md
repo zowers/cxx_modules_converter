@@ -66,16 +66,6 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 - [ ] Add performance tests
 - [ ] Set up automatic deployment to PyPI
 
-### MOD-1007: Enhance Code Quality Automation (Medium)
-**Problem**: Code quality tools need further integration and improvement.
-
-**Tasks:**
-- [ ] Add type checking (mypy) to pre-commit hooks
-- [ ] Configure flake8 to ignore specific non-critical errors
-- [ ] Add security linting (bandit) for potential vulnerabilities
-- [ ] Integrate code coverage reporting (coverage.py) with pre-commit
-- [ ] Create script to automatically fix common issues (autoflake, black, isort)
-
 ### MOD-1008: Refactor Dependency Resolution (High)
 **Problem**: Complex logic in `FilesResolver` makes it difficult to maintain and extend.
 
@@ -181,4 +171,4 @@ This document contains an improvement plan for the `cxx_modules_converter` proje
 
 ---
 *Last updated: 2026-05-12*
-*Document version: 1.5*
+*Document version: 1.6*
