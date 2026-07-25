@@ -56,8 +56,9 @@ def parse_args(argv: list[str] | None = None):
     parser.add_argument(
         '-a',
         '--action',
+        type=ConvertAction,
         default=ConvertAction.MODULES,
-        choices=[ConvertAction.MODULES, ConvertAction.HEADERS],
+        choices=list(ConvertAction),
         help='action to perform - convert to modules or headers',
     )
     parser.add_argument(
@@ -142,12 +143,32 @@ def parse_args(argv: list[str] | None = None):
         help='input C++ source file extensions, .cpp by default. first use replaces the default, subsequent uses append.',  # noqa: E501
     )
     parser.add_argument(
+        '--inextmod',
+        action='append',
+        default=[],
+        help='input module interface extensions for headers action, .cppm by default. first use replaces the default, subsequent uses append.',  # noqa: E501
+    )
+    parser.add_argument(
+        '--inextmodimpl',
+        action='append',
+        default=[],
+        help='input module implementation extensions for headers action, .cpp by default. first use replaces the default, subsequent uses append.',  # noqa: E501
+    )
+    parser.add_argument(
         '--outextmod',
         help=f'output module interface unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_INTERFACE]}',  # noqa: E501
     )
     parser.add_argument(
         '--outextmodimpl',
         help=f'output module implementation unit file extensions. default: {options.content_type_to_ext[ContentType.MODULE_IMPL]}',  # noqa: E501
+    )
+    parser.add_argument(
+        '--outextheader',
+        help=f'output header extension. default: {options.content_type_to_ext[ContentType.HEADER]}',  # noqa: E501
+    )
+    parser.add_argument(
+        '--outextcxx',
+        help=f'output C++ source extension. default: {options.content_type_to_ext[ContentType.CXX]}',  # noqa: E501
     )
     parser.add_argument(
         '--modules',
@@ -254,6 +275,14 @@ def main():
         for ext in parsed_args.inextcxx:
             log_messages.append(f'input C++ source extension: "{ext}"')
             converter.options.add_module_action_ext_type(ext, ContentType.CXX)
+        for ext in parsed_args.inextmod:
+            log_messages.append(f'input module interface extension: "{ext}"')
+            converter.options.add_header_action_ext_type(
+                ext, ContentType.MODULE_INTERFACE
+            )
+        for ext in parsed_args.inextmodimpl:
+            log_messages.append(f'input module implementation extension: "{ext}"')
+            converter.options.add_header_action_ext_type(ext, ContentType.MODULE_IMPL)
         if parsed_args.outextmod:
             ext = parsed_args.outextmod
             log_messages.append(f'output module interface unit extension: "{ext}"')
@@ -266,6 +295,14 @@ def main():
             converter.options.set_output_content_type_to_ext(
                 ContentType.MODULE_IMPL, ext
             )
+        if parsed_args.outextheader:
+            ext = parsed_args.outextheader
+            log_messages.append(f'output header extension: "{ext}"')
+            converter.options.set_output_content_type_to_ext(ContentType.HEADER, ext)
+        if parsed_args.outextcxx:
+            ext = parsed_args.outextcxx
+            log_messages.append(f'output C++ source extension: "{ext}"')
+            converter.options.set_output_content_type_to_ext(ContentType.CXX, ext)
         for modules_pair in parsed_args.modules:
             module_prefix, path = modules_pair.split('=')
             log_messages.append(f'module prefix: "{module_prefix}" in path "{path}"')

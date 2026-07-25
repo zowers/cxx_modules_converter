@@ -7,23 +7,17 @@ from pathlib import Path, PurePosixPath
 from typing import cast
 
 from .compat_header_builder import CompatHeaderBuilder
+from .exceptions import ConversionError
 from .file_processing import (
     FileContent,
     FileContentList,
-    HeaderScanState,
-    Matcher,
+    find_declared_module,
+    get_converted_content_type,
     interface_content_types,
-    new_line,
-    preprocessor_define_rx,
-    preprocessor_endif_rx,
-    preprocessor_if_rx,
-    preprocessor_include_brackets_rx,
-    preprocessor_include_quote_rx,
-    preprocessor_line_comment_rx,
-    preprocessor_other_rx,
-    preprocessor_pragma_once_rx,
-    spaces_rx,
+    parse_module_file,
+    process_header_content,
 )
+from .header_builder import HeaderBuilder
 from .module_base_builder import ModuleBaseBuilder, any_pattern_maches
 from .module_impl_builder import ModuleImplUnitBuilder
 from .module_interface_builder import ModuleInterfaceUnitBuilder
@@ -69,6 +63,8 @@ class Converter:
         self.module_dependencies: dict[str, set[str]] = {}
         # list of found circular dependencies
         self.circular_dependencies: list[list[str]] = []
+        self.header_filenames_by_module: dict[str, Path] = {}
+        self.output_sources: dict[Path, Path] = {}
 
     def convert_file_content_to_module(
         self,
@@ -79,67 +75,9 @@ class Converter:
     ) -> FileContentList:
         if content_type in {ContentType.MODULE_INTERFACE, ContentType.MODULE_IMPL}:
             return [FileContent(filename, content_type, content)]
-        content_lines = content.splitlines()
 
         builder = self.make_builder_to_module(filename, content_type, file_options)
-
-        def is_comment() -> bool:
-            return (
-                not line
-                or line2 == '//'
-                or line2 == '/*'
-                or line3 == '\ufeff//'
-                or line3 == '\ufeff/*'
-            )
-
-        scanState = HeaderScanState.START
-        i = 0
-        while i < len(content_lines):
-            line = content_lines[i]
-            while line and line[-1] == '\\' and i + 1 < len(content_lines):
-                # handle backslash \ as last character on line -- line continues on next line  # noqa: E501
-                i += 1
-                line += new_line + content_lines[i]
-            line2 = line[0:2]
-            line3 = line[0:3]
-            match scanState:
-                case HeaderScanState.START:
-                    if is_comment():
-                        scanState = HeaderScanState.FILE_COMMENT
-                        continue
-                    else:
-                        scanState = HeaderScanState.MAIN
-                        continue
-                case HeaderScanState.FILE_COMMENT:
-                    line2 = line.strip()[0:2]
-                    if is_comment() or line2[0] == '*':
-                        builder.add_file_copyright(line)
-                    else:
-                        scanState = HeaderScanState.MAIN
-                        continue
-                case HeaderScanState.MAIN:
-                    m = Matcher()
-                    if m.match(preprocessor_include_brackets_rx, line):
-                        builder.handle_include_brackets(line, m.matched)
-                    elif m.match(preprocessor_include_quote_rx, line):
-                        builder.handle_include_quote(line, m.matched)
-                    elif m.match(preprocessor_pragma_once_rx, line):
-                        builder.handle_pragma_once(line)
-                    elif (
-                        m.match(preprocessor_line_comment_rx, line)
-                        or m.match(preprocessor_other_rx, line)
-                        or m.match(spaces_rx, line)
-                    ):
-                        builder.handle_preprocessor(line, 0)
-                    elif m.match(preprocessor_define_rx, line):
-                        builder.handle_preprocessor(line, 0)
-                    elif m.match(preprocessor_if_rx, line):
-                        builder.handle_preprocessor(line, 1)
-                    elif m.match(preprocessor_endif_rx, line):
-                        builder.handle_preprocessor(line, -1)
-                    else:
-                        builder.handle_main_content(line)
-            i += 1
+        process_header_content(content, builder)
 
         result: FileContentList = []
         result.append(builder.build_file_content())
@@ -237,9 +175,40 @@ class Converter:
         content_type: ContentType,
         file_options: FileOptions,
     ) -> FileContentList:
-        if content_type in {ContentType.HEADER, ContentType.CXX}:
+        if content_type not in {
+            ContentType.MODULE_INTERFACE,
+            ContentType.MODULE_IMPL,
+        }:
             return [FileContent(filename, content_type, content)]
-        return [FileContent(filename, content_type, content)]
+
+        parsed_file = parse_module_file(content, filename, self.options.compat_macro)
+        converted_type = get_converted_content_type(content_type)
+        converted_filename = Path(
+            self.resolver.convert_filename_to_content_type(filename, converted_type)
+        )
+        if content_type == ContentType.MODULE_INTERFACE and parsed_file.declared_module:
+            self._register_module_header(
+                parsed_file.declared_module, converted_filename
+            )
+
+        builder = HeaderBuilder(
+            self.options,
+            self.resolver,
+            content_type,
+            parsed_file,
+            self.header_filenames_by_module,
+        )
+        builder.set_source_filename(filename)
+        return [builder.build_file_content()]
+
+    def _register_module_header(self, module_name: str, filename: Path) -> None:
+        existing_filename = self.header_filenames_by_module.get(module_name)
+        if existing_filename is not None and existing_filename != filename:
+            raise ConversionError(
+                f'Module "{module_name}" is declared by both '
+                f'"{existing_filename}" and "{filename}"'
+            )
+        self.header_filenames_by_module[module_name] = filename
 
     def convert_file_content(
         self,
@@ -341,6 +310,11 @@ class Converter:
             and source_directory != self.options.root_dir
         ):
             self.add_filesystem_directory(self.options.root_dir)
+            if self.action == ConvertAction.HEADERS:
+                self._index_module_interfaces(
+                    self.options.root_dir,
+                    source_directory.relative_to(self.options.root_dir),
+                )
             self.convert_directory_impl(
                 self.options.root_dir,
                 destination_directory,
@@ -349,12 +323,56 @@ class Converter:
             )
         else:
             self.add_filesystem_directory(source_directory)
+            if self.action == ConvertAction.HEADERS:
+                self._index_module_interfaces(source_directory, Path())
             self.convert_directory_impl(
                 source_directory, destination_directory, Path(), FileOptions()
             )
 
         self.create_joined_module_files(destination_directory)
         self.print_circular_dependencies()
+
+    def _index_module_interfaces(self, source_directory: Path, subdir: Path) -> None:
+        scan_directory = source_directory.joinpath(subdir)
+        for filepath in scan_directory.rglob('*'):
+            if not filepath.is_file():
+                continue
+            filename = filepath.relative_to(source_directory)
+            if any_pattern_maches(self.options.skip_patterns, PurePosixPath(filename)):
+                continue
+            content_type = self.resolver.get_source_content_type(
+                ConvertAction.HEADERS, filename
+            )
+            if content_type not in {
+                ContentType.MODULE_INTERFACE,
+                ContentType.MODULE_IMPL,
+            }:
+                continue
+            converted_type = get_converted_content_type(content_type)
+            output_filename = Path(
+                self.resolver.convert_filename_to_content_type(filename, converted_type)
+            )
+            existing_source = self.output_sources.get(output_filename)
+            if existing_source is not None and existing_source != filename:
+                raise ConversionError(
+                    f'Both "{existing_source}" and "{filename}" convert to '
+                    f'"{output_filename}"'
+                )
+            output_path = source_directory / output_filename
+            if output_path.exists() and output_path != filepath:
+                raise ConversionError(
+                    f'Cannot convert "{filename}": output file '
+                    f'"{output_filename}" already exists'
+                )
+            self.output_sources[output_filename] = filename
+            if content_type != ContentType.MODULE_INTERFACE:
+                continue
+            with open(filepath) as source_file:
+                content = source_file.read()
+            module_name = find_declared_module(content)
+            if not module_name:
+                continue
+            self._register_module_header(module_name, output_filename)
 
     def create_joined_module_files(self, destination_directory: Path):
         for _, joint_builder in self.joint_module_builders.items():

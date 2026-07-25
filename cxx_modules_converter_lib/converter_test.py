@@ -1,14 +1,17 @@
 import os
 import os.path
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from cxx_modules_converter_lib import (
     ContentType,
+    ConversionError,
     ConvertAction,
     Converter,
+    FileContent,
     convert_directory,
 )
 
@@ -699,3 +702,151 @@ def test_dir_circular_dependencies_impl_cmake(dir_simple: Path, preset: str):
     )
 
     run_cmake_test(dir_simple, preset)
+
+
+def test_convert_module_interface_to_header():
+    converter = Converter(ConvertAction.HEADERS)
+
+    result = converter.convert_file_content(
+        'module;\n'
+        '#include <vector>\n'
+        'export module example;\n'
+        'export {\n'
+        '\n'
+        'class Example {};\n'
+        'constexpr auto closing_brace = "}";\n'
+        '}\n',
+        'example.cppm',
+    )
+
+    assert result == [
+        FileContent(
+            'example.h',
+            ContentType.HEADER,
+            '#pragma once\n'
+            '#include <vector>\n'
+            '\n'
+            'class Example {};\n'
+            'constexpr auto closing_brace = "}";\n',
+        )
+    ]
+
+
+def test_convert_headers_directory(tmp_path: Path):
+    source_dir = tmp_path / 'input'
+    result_dir = tmp_path / 'result'
+    source_dir.mkdir()
+    (source_dir / 'parts').mkdir()
+    (source_dir / 'library.cppm').write_text(
+        'export module library;\n'
+        'export import :detail;\n'
+        'export {\n'
+        'class Library {};\n'
+        '} // export\n'
+    )
+    (source_dir / 'parts' / 'detail.cppm').write_text(
+        'export module library:detail;\n'
+        'export {\n'
+        'class Detail {};\n'
+        '} // export\n'
+    )
+    (source_dir / 'library.cpp').write_text(
+        'module;\n'
+        '#include <string>\n'
+        'module library;\n'
+        'import :detail;\n'
+        'void use_library() {}\n'
+    )
+    (source_dir / 'main.cpp').write_text('import library;\nint main() {}\n')
+    (source_dir / 'parts' / 'user.cpp').write_text('import library;\n')
+
+    converter = Converter(ConvertAction.HEADERS)
+    converter.convert_directory(source_dir, result_dir)
+
+    assert_files(
+        result_dir,
+        result_dir,
+        [
+            'library.h',
+            'parts/detail.h',
+            'parts/user.cpp',
+            'library.cpp',
+            'main.cpp',
+        ],
+    )
+    assert (result_dir / 'library.h').read_text() == (
+        '#pragma once\n#include "parts/detail.h"\nclass Library {};\n'
+    )
+    assert (result_dir / 'parts' / 'detail.h').read_text() == (
+        '#pragma once\nclass Detail {};\n'
+    )
+    assert (result_dir / 'library.cpp').read_text() == (
+        '#include <string>\n'
+        '#include "library.h"\n'
+        '#include "parts/detail.h"\n'
+        'void use_library() {}\n'
+    )
+    assert (result_dir / 'main.cpp').read_text() == (
+        '#include "library.h"\nint main() {}\n'
+    )
+    assert (result_dir / 'parts' / 'user.cpp').read_text() == (
+        '#include "../library.h"\n'
+    )
+
+
+def test_convert_headers_rejects_unresolved_import():
+    converter = Converter(ConvertAction.HEADERS)
+
+    with pytest.raises(ConversionError, match='Cannot resolve imported module'):
+        converter.convert_file_content('import missing;\n', 'main.cpp')
+
+
+def test_convert_headers_rejects_private_module_fragment():
+    converter = Converter(ConvertAction.HEADERS)
+
+    with pytest.raises(ConversionError, match='Private module fragment'):
+        converter.convert_file_content(
+            'export module example;\nmodule :private;\nint private_value;\n',
+            'example.cppm',
+        )
+
+
+def test_cli_accepts_headers_action_and_extensions(tmp_path: Path):
+    source_dir = tmp_path / 'modules'
+    result_dir = tmp_path / 'headers'
+    source_dir.mkdir()
+    (source_dir / 'example.ixx').write_text(
+        'export module example;\nexport struct Example {};\n'
+    )
+    (source_dir / 'example.cxxm').write_text('module example;\n')
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            'cxx_modules_converter.py',
+            '--action',
+            'headers',
+            '--directory',
+            str(source_dir),
+            '--destination',
+            str(result_dir),
+            '--root',
+            str(source_dir),
+            '--inextmod',
+            '.ixx',
+            '--inextmodimpl',
+            '.cxxm',
+            '--outextheader',
+            '.hpp',
+            '--outextcxx',
+            '.cc',
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (result_dir / 'example.hpp').read_text() == (
+        '#pragma once\nstruct Example {};\n'
+    )
+    assert (result_dir / 'example.cc').read_text() == '#include "example.hpp"\n'

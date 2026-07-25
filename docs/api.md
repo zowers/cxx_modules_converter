@@ -152,6 +152,10 @@ Builds a module implementation unit (`.cpp`).
 
 Builds a compatibility header (`.h`) that re-exports a module via `#include`.
 
+### `HeaderBuilder`
+
+Builds a traditional header (`.h`) or C++ source from records produced by `parse_module_file`.
+
 ### `FileBaseBuilder`
 
 Base class for all builders.
@@ -174,6 +178,16 @@ Utility for matching lines against regular expressions.
 ### `HeaderScanState`
 
 Tracks the state while scanning a header for `#include` directives.
+
+### `ParsedModuleFile` and `ModuleLine`
+
+Structured output from parsing a module interface or implementation file. `ModuleLineKind` identifies module declarations, imports, export blocks, exported declarations, and unchanged content.
+
+### Parsing Functions
+
+- `parse_module_file(content, filename, compatibility_macro) -> ParsedModuleFile` parses module syntax for reverse conversion.
+- `find_declared_module(content) -> str | None` extracts a named module declaration.
+- `process_header_content(content, handler) -> None` parses traditional headers and dispatches records to a module builder.
 
 ## Convenience Functions
 

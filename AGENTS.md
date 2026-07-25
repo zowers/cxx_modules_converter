@@ -17,8 +17,9 @@
    - `converter.py` - `Converter` class, main conversion logic
    - `options.py` - `Options`, `FileOptions`, `ConvertAction`, `ContentType`, constants
    - `resolvers.py` - `FilesResolver`, `ModuleFilesResolver`, `FilesMap`
-   - `file_processing.py` - `FileContent`, `Matcher`, regular expressions, helper functions
+   - `file_processing.py` - file parsers, parsed module records, regular expressions, helper functions
    - `file_base_builder.py` - `FileBaseBuilder`, `FileProcessingState`
+   - `header_builder.py` - `HeaderBuilder` for converting parsed modules to headers and C++ sources
    - `module_base_builder.py` - `ModuleBaseBuilder`, `any_pattern_maches`
    - `module_interface_builder.py` - `ModuleInterfaceUnitBuilder`
    - `module_impl_builder.py` - `ModuleImplUnitBuilder`

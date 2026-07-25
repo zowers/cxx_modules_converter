@@ -21,6 +21,20 @@ This will:
 - Copy other files unchanged.
 - Place the results in `project/out`, preserving the directory structure.
 
+### Converting Modules to Headers
+
+Convert `.cppm` module interfaces to `.h` headers and update `.cpp` files to use `#include` directives:
+
+```bash
+python cxx_modules_converter.py -a headers -s project/modules -d project/src
+```
+
+The converter indexes module declarations before processing files, so named imports and relative partition imports resolve to relative paths for the corresponding generated headers. Generated headers use `#pragma once`. Header-unit imports such as `import <vector>;` become `#include <vector>`. An unresolved named import causes an error rather than an unsafe guessed include path.
+
+Use `--inextmod`, `--inextmodimpl`, `--outextheader`, and `--outextcxx` to customize reverse-conversion extensions.
+
+Compatibility modules, private module fragments, and multiline export declarations are not supported by reverse conversion and produce an explicit error.
+
 ### In-Place Conversion
 
 Convert files in the same directory, replacing headers with module interface units and updating source files accordingly.

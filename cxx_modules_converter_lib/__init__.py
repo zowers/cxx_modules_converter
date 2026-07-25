@@ -10,7 +10,19 @@ from .exceptions import (
     ValidationError,
 )
 from .file_base_builder import FileBaseBuilder, FileProcessingState
-from .file_processing import FileContent, HeaderScanState, LineCompatibility, Matcher
+from .file_processing import (
+    FileContent,
+    HeaderScanState,
+    LineCompatibility,
+    Matcher,
+    ModuleLine,
+    ModuleLineKind,
+    ParsedModuleFile,
+    find_declared_module,
+    parse_module_file,
+    process_header_content,
+)
+from .header_builder import HeaderBuilder
 from .module_base_builder import ModuleBaseBuilder, any_pattern_maches
 from .module_impl_builder import ModuleImplUnitBuilder
 from .module_interface_builder import ModuleInterfaceUnitBuilder
@@ -42,6 +54,13 @@ __all__ = [
     'LineCompatibility',
     'FileBaseBuilder',
     'FileProcessingState',
+    'HeaderBuilder',
+    'ModuleLine',
+    'ModuleLineKind',
+    'ParsedModuleFile',
+    'find_declared_module',
+    'parse_module_file',
+    'process_header_content',
     'ModuleBaseBuilder',
     'any_pattern_maches',
     'ModuleInterfaceUnitBuilder',

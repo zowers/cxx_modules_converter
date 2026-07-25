@@ -8,12 +8,13 @@ The converter follows a pipeline architecture:
 
 1. **File Discovery** – `FilesResolver` scans the source directory, classifies files by `ContentType`, and applies skip/compat/header patterns.
 2. **Dependency Resolution** – The resolver builds a graph of `#include` relationships and maps them to module imports.
-3. **Content Transformation** – For each file, a **Builder** (selected based on content type and conversion action) rewrites the source lines:
+3. **Parsing** – `file_processing.py` parses traditional files or module files into handler calls or structured records.
+4. **Content Transformation** – A **Builder** selected by content type and conversion action rewrites the parsed input:
    - `#include <...>` → moved to global module fragment or replaced with `import std;`
    - `#include "..."` → converted to `import module.name;`
    - `#pragma once` and include guards are removed.
    - Module declarations (`export module ...`) and partitions are added.
-4. **Output Generation** – The builder produces a `FileContent` object that is written to the destination directory.
+5. **Output Generation** – The builder produces a `FileContent` object that is written to the destination directory.
 
 ### Core Data Structures
 
@@ -34,8 +35,9 @@ The converter follows a pipeline architecture:
 - **`converter.py`** – The central `Converter` class orchestrates the whole conversion. It uses the resolver and builders.
 - **`options.py`** – `Options` (global settings), `FileOptions` (per-file settings), and enums (`ConvertAction`, `ContentType`).
 - **`resolvers.py`** – `FilesResolver` and `ModuleFilesResolver` implement file classification and dependency resolution.
-- **`file_processing.py`** – Low-level utilities: `FileContent`, `Matcher` (regex matching), `HeaderScanState`, and the regular expressions used to parse C++ preprocessor directives.
+- **`file_processing.py`** – File parsers, parsed module records, `FileContent`, `Matcher`, and parsing regular expressions.
 - **`file_base_builder.py`** – Abstract `FileBaseBuilder` and `FileProcessingState`; common logic for all builders.
+- **`header_builder.py`** – `HeaderBuilder` converts parsed module files to traditional headers and C++ sources.
 - **`module_base_builder.py`** – `ModuleBaseBuilder` extends `FileBaseBuilder` and adds module-specific logic (global module fragment, import/export handling).
 - **`module_interface_builder.py`** – `ModuleInterfaceUnitBuilder` produces module interface units (`.cppm`).
 - **`module_impl_builder.py`** – `ModuleImplUnitBuilder` produces module implementation units (`.cpp`).

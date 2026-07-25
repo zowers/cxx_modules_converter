@@ -11,7 +11,7 @@ Python 3.10 or later is required.
 
 ## Usage
 Script can be used as following:
-> cxx_modules_converter.py [-h] [-s DIRECTORY] [-i] [-d DESTINATION] [-a {modules,headers}] [-r ROOT] [-p] [-I INCLUDE] [-n NAME] [-k SKIP] [-c COMPAT] [-m COMPAT_MACRO] [-e HEADER] [--export EXPORT] [--exportsuffix EXPORTSUFFIX] [--inextheader INEXTHEADER] [--inextcxx INEXTCXX] [--outextmod OUTEXTMOD] [--outextmodimpl OUTEXTMODIMPL] [--modules MODULES] [--modulestd] [--modulestdcompat] [--join JOIN] [-v]
+> cxx_modules_converter.py [-h] [-s DIRECTORY] [-i] [-d DESTINATION] [-a {modules,headers}] [-r ROOT] [-p] [-I INCLUDE] [-n NAME] [-k SKIP] [-c COMPAT] [-m COMPAT_MACRO] [-e HEADER] [--export EXPORT] [--exportsuffix EXPORTSUFFIX] [--inextheader INEXTHEADER] [--inextcxx INEXTCXX] [--inextmod INEXTMOD] [--inextmodimpl INEXTMODIMPL] [--outextmod OUTEXTMOD] [--outextmodimpl OUTEXTMODIMPL] [--outextheader OUTEXTHEADER] [--outextcxx OUTEXTCXX] [--modules MODULES] [--modulestd] [--modulestdcompat] [--join JOIN] [-v]
 
 ### Options:
 * -h, --help            show this help message and exit
@@ -40,9 +40,13 @@ Script can be used as following:
                         export module suffix for which `export import` is used instead of simple `import`
 * --inextheader INEXTHEADER input header file extensions, .h by default. first use replaces the default, subsequent uses append.
 * --inextcxx INEXTCXX   input C++ source file extensions, .cpp by default. first use replaces the default, subsequent uses append.
+* --inextmod INEXTMOD   input module interface extensions for the `headers` action, .cppm by default. first use replaces the default, subsequent uses append.
+* --inextmodimpl INEXTMODIMPL input module implementation extensions for the `headers` action, .cpp by default. first use replaces the default, subsequent uses append.
 * --outextmod OUTEXTMOD output module interface unit file extensions. default: .cppm
   *  e.g. `--outextmod=.ixx` to skip the need to change `/interface /TP` options in msvc (https://learn.microsoft.com/en-us/cpp/build/reference/interface?view=msvc-170)
 * --outextmodimpl OUTEXTMODIMPL  output module implementation unit file extensions. default: .cpp
+* --outextheader OUTEXTHEADER output header extension for the `headers` action. default: .h
+* --outextcxx OUTEXTCXX output C++ source extension for the `headers` action. default: .cpp
 * --modules MODULES     `M=P`: start modules tree `M` at path `P`, directory separator is converted to `.` (dot). Default: use directory name and file name as module name.
 * --modulestd MODULESTD
                         Enable `std` module, i.e. define `--modules vector=std` to replace `vector` and other standard headers to `import std;`.
@@ -58,8 +62,17 @@ The converter has several configurable assumptions:
   * `.cpp` - c++ source file (input), configurable with `--inextcxx`
   * `.cpp` - module implementation unit (output), configurable with `--outextmodimpl`
   * `.cppm` - module interface unit (output), configurable with `--outextmod`
+  * for the `headers` action, `.cppm` and `.cpp` are the default inputs and `.h` and `.cpp` are the default outputs
 * header file path is used to determine module name by joining path parts with dots (`.`); same for c++ source files, but can be customized using `--join` option to combine multiple files into module partitions
 * system header includes using `#include <>` are moved to global module fragment, but standard library headers can be replaced with `import std;` using `--modulestd` or `import std.compat;` using `--modulestdcompat`
+
+To convert module files back to headers and C++ sources:
+
+```bash
+cxx_modules_converter.py -a headers -s modules -d sources
+```
+
+Generated headers use `#pragma once`. Named imports and module partitions are converted to relative includes by matching module declarations in the source directory. Header-unit imports such as `import <vector>;` are converted directly. Conversion fails when a named import cannot be resolved, because guessing a header path could produce invalid C++. Compatibility modules, private module fragments, and multiline export declarations are not supported by the reverse conversion.
 
 ## Documentation
 
