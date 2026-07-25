@@ -112,3 +112,8 @@ poetry version patch  # for patch version
 poetry version minor  # for minor version
 poetry version major  # for major version
 ```
+
+## Alternative Converters
+
+- A helper to convert a header-based C++ project to module-based one. Written in C++ and depends on the Clang/LLVM libraries: https://github.com/ChuanqiXu9/clang-modules-converter
+- Automagically rewrite header-based C++ into using modules. Written in C++: https://github.com/msqr1/importizer
