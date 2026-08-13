@@ -304,6 +304,8 @@ class Converter:
         self.copied_files += 1
 
     def convert_directory(self, source_directory: Path, destination_directory: Path):
+        source_directory = Path(source_directory)
+        destination_directory = Path(destination_directory)
         if (
             self.options.root_dir
             and self.options.root_dir != Path()

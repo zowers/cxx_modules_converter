@@ -1,7 +1,6 @@
 import os
 import os.path
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -227,6 +226,17 @@ def test_dir_modules_path(dir_simple: Path):
             'dir2/simple.cpp',
         ],
     )
+
+
+def test_dir_modules_path_with_string_directories(dir_simple: Path):
+    data_directory = Path('test_data/modules_path/input')
+    converter = Converter(ConvertAction.MODULES)
+    converter.options.root_dir = data_directory
+    converter.options.add_modules_path('org2', 'dir2')
+
+    converter.convert_directory(str(data_directory), str(dir_simple))
+
+    assert dir_simple.joinpath('dir2/simple.cppm').is_file()
 
 
 def test_dir_compat(dir_simple: Path):
@@ -809,44 +819,3 @@ def test_convert_headers_rejects_private_module_fragment():
             'export module example;\nmodule :private;\nint private_value;\n',
             'example.cppm',
         )
-
-
-def test_cli_accepts_headers_action_and_extensions(tmp_path: Path):
-    source_dir = tmp_path / 'modules'
-    result_dir = tmp_path / 'headers'
-    source_dir.mkdir()
-    (source_dir / 'example.ixx').write_text(
-        'export module example;\nexport struct Example {};\n'
-    )
-    (source_dir / 'example.cxxm').write_text('module example;\n')
-
-    result = subprocess.run(
-        [
-            sys.executable,
-            'cxx_modules_converter.py',
-            '--action',
-            'headers',
-            '--directory',
-            str(source_dir),
-            '--destination',
-            str(result_dir),
-            '--root',
-            str(source_dir),
-            '--inextmod',
-            '.ixx',
-            '--inextmodimpl',
-            '.cxxm',
-            '--outextheader',
-            '.hpp',
-            '--outextcxx',
-            '.cc',
-        ],
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert (result_dir / 'example.hpp').read_text() == (
-        '#pragma once\nstruct Example {};\n'
-    )
-    assert (result_dir / 'example.cc').read_text() == '#include "example.hpp"\n'

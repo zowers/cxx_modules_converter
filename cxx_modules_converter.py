@@ -304,9 +304,11 @@ def main():
             log_messages.append(f'output C++ source extension: "{ext}"')
             converter.options.set_output_content_type_to_ext(ContentType.CXX, ext)
         for modules_pair in parsed_args.modules:
-            module_prefix, path = modules_pair.split('=')
-            log_messages.append(f'module prefix: "{module_prefix}" in path "{path}"')
-            converter.options.add_modules_path(module_prefix, path)
+            module_prefix, module_path = modules_pair.split('=', 1)
+            log_messages.append(
+                f'module prefix: "{module_prefix}" in path "{module_path}"'
+            )
+            converter.options.add_modules_path(module_prefix, module_path)
         if parsed_args.modulestd:
             if parsed_args.modulestdcompat:
                 raise ValueError("Cannot use both --modulestd and --modulestdcompat")
